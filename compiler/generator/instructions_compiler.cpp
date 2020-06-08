@@ -41,6 +41,7 @@
 #include "simplify.hh"
 #include "timing.hh"
 #include "xtended.hh"
+#include "sigToSDF.hh"
 
 using namespace std;
 
@@ -193,6 +194,7 @@ Tree InstructionsCompiler::prepare(Tree LS)
     if (gGlobal->gPrintSDFSwitch) {
         cout << "SDF Switch = TRUE" << endl;
         ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
+        sigToSDF(L5, xmlfile);
     }
     return L5;
 }
