@@ -518,6 +518,7 @@ struct global {
     int    gBalancedSwitch;
     string gArchFile;
     bool   gExportDSP;
+    bool   gPrintSDFSwitch;
 
     // Source file injection
     bool   gInjectFlag;

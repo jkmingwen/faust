@@ -189,6 +189,11 @@ Tree InstructionsCompiler::prepare(Tree LS)
         ofstream dotfile(subst("$0-sig.dot", gGlobal->makeDrawPath()).c_str());
         sigToGraph(L5, dotfile);
     }
+
+    if (gGlobal->gPrintSDFSwitch) {
+        cout << "SDF Switch = TRUE" << endl;
+        ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
+    }
     return L5;
 }
 

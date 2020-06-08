@@ -446,6 +446,10 @@ static bool processCmdline(int argc, const char* argv[])
             gTimingSwitch = true;
             i += 1;
 
+        } else if (isCmd(argv[i], "-sdf", "--sdf3xml")) {
+            gGlobal->gPrintSDFSwitch = true;
+            i += 1;
+
             // double float options
         } else if (isCmd(argv[i], "-single", "--single-precision-floats")) {
             if (float_size && gGlobal->gFloatSize != 1) {
