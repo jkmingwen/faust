@@ -12,6 +12,7 @@
 #include "sigtype.hh"
 #include "sigtyperules.hh"
 #include "xtended.hh"
+#include "SDF.hh"
 
 using namespace std;
 
@@ -20,8 +21,10 @@ using namespace std;
  * SDF3-compatible XML format
  */
 void sigToSDF(Tree L, ofstream& fout)
-{  
-    fout << "<?xml version=\"1.0\" encoding=\"UTF08\"?>\n"
+{
+    set<Tree> alreadyDrawn;
+    
+    fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          << "<sdf3 type=\"sdf\" version=\"1.0\"\n"
          << "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
          << "xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
@@ -36,4 +39,188 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "</sdfProperties>" << endl;
     fout << "</applicationGraph>" << endl;
     fout << "</sdf3>" << endl;
+    // cout << "Printing name" << endl;
+    
+    while (isList(L)) {
+        recdraw(hd(L), alreadyDrawn, fout);
+        L = tl(L);
+    }
+}
+
+/**
+ * Draw recursively a signal
+ */
+static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
+{
+    // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
+    vector<Tree> subsig;
+    int          n;
+
+    if (drawn.count(sig) == 0) {
+        drawn.insert(sig);
+        if (isList(sig)) {
+            do {
+                recdraw(hd(sig), drawn, fout);
+                sig = tl(sig);
+            } while (isList(sig));
+        } else {
+            // draw the node
+            fout << "<actor name='" << sigLabel(sig) << "'>" << endl;
+            // TODO Add actor to graph
+            // stringstream actorName; // workaround to get unique actor names from signal
+            // actorName << sig;
+            // Actor newActor = Actor(actorName.str(), sigLabel(sig));
+
+            // draw the subsignals
+            n = getSubSignals(sig, subsig);
+            if (n > 0) {
+                if (n == 1 && isList(subsig[0])) {
+                    Tree id, body;
+                    faustassert(isRec(sig, id, body));
+                    if (!isRec(sig, id, body)) {
+                    }
+                    // special recursion case, recreate a vector of subsignals instead of the
+                    // list provided by getSubSignal
+                    Tree L = subsig[0];
+                    subsig.clear();
+                    n = 0;
+                    do {
+                        subsig.push_back(hd(L));
+                        L = tl(L);
+                        n += 1;
+                    } while (isList(L));
+                }
+
+                for (int i = 0; i < n; i++) {
+                    recdraw(subsig[i], drawn, fout);
+                    fout << sigLabel(subsig[i]) << " -> " << sigLabel(sig) << endl;
+                    // "[" << edgeattr(getCertifiedSigType(subsig[i]))
+                         // << "];" << endl;
+                    // TODO add port to subsig[i] (output) and sig (input)
+                }
+            }
+        }
+    }
+    // cerr << --gGlobal->TABBER << "EXIT REC DRAW OF " << sig << endl;
+}
+
+/**
+ * translate signal binary operations into strings
+ */
+static const char* binopname[] = {"+", "-", "*", "/", "%", "<<", ">>", ">", "<", ">=", "<=", "==", "!=", "&", "|", "^"};
+
+/**
+ * return the label of a signal as a string
+ */
+static string sigLabel(Tree sig)
+{
+    int    i;
+    double r;
+    Tree   x, y, z, c, type, name, file, ff, largs, id, le, sel, var, label;
+
+    xtended* p = (xtended*)getUserData(sig);
+
+    stringstream fout;
+
+    if (p) {
+        fout << p->name();
+    } else if (isSigInt(sig, &i)) {
+        fout << i;
+    } else if (isSigReal(sig, &r)) {
+        fout << r;
+    } else if (isSigWaveform(sig)) {
+        fout << "waveform";
+    }
+
+    else if (isSigInput(sig, &i)) {
+        fout << "INPUT_" << i;
+    }
+    // else if ( isSigOutput(sig, &i, x) )             { fout << "OUTPUT_" << i; }
+
+    else if (isSigDelay1(sig, x)) {
+        fout << "mem";
+    } else if (isSigFixDelay(sig, x, y)) {
+        fout << "@";
+    } else if (isSigPrefix(sig, x, y)) {
+        fout << "prefix";
+    } else if (isSigIota(sig, x)) {
+        fout << "iota";
+    } else if (isSigBinOp(sig, &i, x, y)) {
+        fout << binopname[i];
+    } else if (isSigFFun(sig, ff, largs)) {
+        fout << "ffunction:" << *ff;
+    } else if (isSigFConst(sig, type, name, file)) {
+        fout << *name;
+    } else if (isSigFVar(sig, type, name, file)) {
+        fout << *name;
+    }
+
+    else if (isSigTable(sig, id, x, y)) {
+        fout << "table:" << id;
+    } else if (isSigWRTbl(sig, id, x, y, z)) {
+        fout << "write:" << id;
+    } else if (isSigRDTbl(sig, x, y)) {
+        fout << "read";
+    }
+
+    else if (isSigSelect2(sig, sel, x, y)) {
+        fout << "select2";
+    } else if (isSigSelect3(sig, sel, x, y, z)) {
+        fout << "select3";
+    }
+
+    else if (isSigGen(sig, x)) {
+        fout << "generator";
+    }
+
+    else if (isProj(sig, &i, x)) {
+        fout << "Proj" << i;
+    } else if (isRec(sig, var, le)) {
+        fout << "REC " << *var;
+    }
+
+    else if (isSigIntCast(sig, x)) {
+        fout << "int";
+    } else if (isSigFloatCast(sig, x)) {
+        fout << "float";
+    }
+#if 0
+    else if ( isSigButton(sig, label) ) 			{ fout << "button \"" << *label << '"'; }
+    else if ( isSigCheckbox(sig, label) ) 			{ fout << "checkbox \"" << *label << '"'; }
+    else if ( isSigVSlider(sig, label,c,x,y,z) )	{ fout << "vslider \"" << *label << '"';  }
+    else if ( isSigHSlider(sig, label,c,x,y,z) )	{ fout << "hslider \"" << *label << '"';  }
+    else if ( isSigNumEntry(sig, label,c,x,y,z) )	{ fout << "nentry \"" << *label << '"';  }
+    
+    else if ( isSigVBargraph(sig, label,x,y,z) )	{ fout << "vbargraph \"" << *label << '"'; 	}
+    else if ( isSigHBargraph(sig, label,x,y,z) )	{ fout << "hbargraph \"" << *label << '"'; 	}
+#else
+    else if (isSigButton(sig, label)) {
+        fout << "button";
+    } else if (isSigCheckbox(sig, label)) {
+        fout << "checkbox";
+    } else if (isSigVSlider(sig, label, c, x, y, z)) {
+        fout << "vslider";
+    } else if (isSigHSlider(sig, label, c, x, y, z)) {
+        fout << "hslider";
+    } else if (isSigNumEntry(sig, label, c, x, y, z)) {
+        fout << "nentry";
+    }
+
+    else if (isSigVBargraph(sig, label, x, y, z)) {
+        fout << "vbargraph";
+    } else if (isSigHBargraph(sig, label, x, y, z)) {
+        fout << "hbargraph";
+    }
+#endif
+    else if (isSigAttach(sig, x, y)) {
+        fout << "attach";
+    }
+
+    else {
+        stringstream error;
+        error << "ERROR : unrecognized signal : " << *sig << endl;
+        throw faustexception(error.str());
+    }
+
+    return fout.str();
 }

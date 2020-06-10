@@ -13,5 +13,7 @@ using namespace std;
  * SDF3-compatible XML format
  */
 void sigToSDF(Tree L, ofstream& fout);
+static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout);
+static string sigLabel(Tree sig);
 
 #endif  // SIGTOSDF_HH
