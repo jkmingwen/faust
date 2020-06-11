@@ -12,7 +12,6 @@
 #include "sigtype.hh"
 #include "sigtyperules.hh"
 #include "xtended.hh"
-#include "SDF.hh"
 
 using namespace std;
 
@@ -40,17 +39,21 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "</applicationGraph>" << endl;
     fout << "</sdf3>" << endl;
     // cout << "Printing name" << endl;
-    
+    map<string, Actor> actorList;
     while (isList(L)) {
-        recdraw(hd(L), alreadyDrawn, fout);
+        recdraw(hd(L), alreadyDrawn, fout, actorList);
         L = tl(L);
+    }
+    for (auto& a : actorList) {
+        a.second.printInfo();
     }
 }
 
 /**
  * Draw recursively a signal
  */
-static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
+static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
+                    map<string, Actor>& actorList)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -60,16 +63,20 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
         drawn.insert(sig);
         if (isList(sig)) {
             do {
-                recdraw(hd(sig), drawn, fout);
+                recdraw(hd(sig), drawn, fout, actorList);
                 sig = tl(sig);
             } while (isList(sig));
         } else {
             // draw the node
             fout << "<actor name='" << sigLabel(sig) << "'>" << endl;
             // TODO Add actor to graph
-            // stringstream actorName; // workaround to get unique actor names from signal
-            // actorName << sig;
+            stringstream actorName; // workaround to get unique actor names from signal
+            actorName << sig;
             // Actor newActor = Actor(actorName.str(), sigLabel(sig));
+            // actorList.push_back(Actor(actorName.str(), sigLabel(sig)));
+            actorList.insert(pair<string, Actor>(actorName.str(),
+                                                 Actor(actorName.str(), sigLabel(sig))));
+            // newActor.printInfo();
 
             // draw the subsignals
             n = getSubSignals(sig, subsig);
@@ -92,11 +99,23 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
                 }
 
                 for (int i = 0; i < n; i++) {
-                    recdraw(subsig[i], drawn, fout);
+                    recdraw(subsig[i], drawn, fout, actorList);
                     fout << sigLabel(subsig[i]) << " -> " << sigLabel(sig) << endl;
                     // "[" << edgeattr(getCertifiedSigType(subsig[i]))
                          // << "];" << endl;
                     // TODO add port to subsig[i] (output) and sig (input)
+                    stringstream srcActor;
+                    stringstream dstActor;
+                    srcActor << subsig[i];
+                    dstActor << sig;
+                    string srcPortName("out_" + srcActor.str());
+                    string dstPortName("in_" + dstActor.str());
+                    actorList.at(srcActor.str()).addPort(Port(srcPortName,
+                                                              portType::out,
+                                                              1));
+                    actorList.at(dstActor.str()).addPort(Port(dstPortName,
+                                                              portType::in,
+                                                              1));
                 }
             }
         }

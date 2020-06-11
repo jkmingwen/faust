@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include "signals.hh"
+#include "SDF.hh"
 
 using namespace std;
 
@@ -13,7 +14,8 @@ using namespace std;
  * SDF3-compatible XML format
  */
 void sigToSDF(Tree L, ofstream& fout);
-static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout);
+static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
+                    map<string, Actor>& actors);
 static string sigLabel(Tree sig);
 
 #endif  // SIGTOSDF_HH
