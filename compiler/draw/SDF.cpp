@@ -71,6 +71,66 @@ void Actor::printInfo()
 {
     std::cout << "Actor name, type: " << this->getName() << ", " << this->getType() << std::endl;
     for (auto i : this->ports) {
-        std::cout << i.getName() << std::endl;
+        std::cout << "\tPort: " << i.getName() << std::endl;
     }
+}
+
+Channel::Channel(string name, string srcActor, string srcPort,
+                 string dstActor, string dstPort,
+                 int size, int initialTokens)
+    : name{name},
+      srcActor{srcActor},
+      dstActor{dstActor},
+      srcPort{srcPort},
+      dstPort{dstPort},
+      size{size},
+      initialTokens{initialTokens}
+{
+}
+
+Channel::Channel(string name, string srcActor, string srcPort,
+                 string dstActor, string dstPort)
+    : name{name},
+      srcActor{srcActor},
+      dstActor{dstActor},
+      srcPort{srcPort},
+      dstPort{dstPort},
+      size{0},
+      initialTokens{0}
+{
+}
+
+string Channel::getName()
+{
+    return this->name;
+}
+
+string Channel::getSrcActor()
+{
+    return this->srcActor;
+}
+
+string Channel::getDstActor()
+{
+    return this->dstActor;
+}
+
+string Channel::getSrcPort()
+{
+    return this->srcPort;
+}
+
+string Channel::getDstPort()
+{
+    return this->dstPort;
+}
+
+void Channel::printInfo()
+{
+    cout << "Channel name: " << this->getName() << endl;
+    cout << "\tSource Port: " << this->getSrcPort() << endl;
+    cout << "\tDest Port: " << this->getDstPort() << endl;
+    cout << "\tSrcActor: " << this->getSrcActor() << endl;
+    cout << "\tDstActor: " << this->getDstActor() << endl;
+    
 }

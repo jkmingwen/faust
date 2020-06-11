@@ -40,12 +40,17 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "</sdf3>" << endl;
     // cout << "Printing name" << endl;
     map<string, Actor> actorList;
+    map<string, Channel> chList;
+    int chCount = 0;
     while (isList(L)) {
-        recdraw(hd(L), alreadyDrawn, fout, actorList);
+        recdraw(hd(L), alreadyDrawn, fout, actorList, chList, chCount);
         L = tl(L);
     }
     for (auto& a : actorList) {
         a.second.printInfo();
+    }
+    for (auto& c : chList) {
+        c.second.printInfo();
     }
 }
 
@@ -53,7 +58,8 @@ void sigToSDF(Tree L, ofstream& fout)
  * Draw recursively a signal
  */
 static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
-                    map<string, Actor>& actorList)
+                    map<string, Actor>& actorList, map<string, Channel>& chList,
+                    int& chCount)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -63,7 +69,7 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
         drawn.insert(sig);
         if (isList(sig)) {
             do {
-                recdraw(hd(sig), drawn, fout, actorList);
+                recdraw(hd(sig), drawn, fout, actorList, chList, chCount);
                 sig = tl(sig);
             } while (isList(sig));
         } else {
@@ -99,23 +105,29 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
                 }
 
                 for (int i = 0; i < n; i++) {
-                    recdraw(subsig[i], drawn, fout, actorList);
+                    recdraw(subsig[i], drawn, fout, actorList, chList, chCount);
                     fout << sigLabel(subsig[i]) << " -> " << sigLabel(sig) << endl;
                     // "[" << edgeattr(getCertifiedSigType(subsig[i]))
                          // << "];" << endl;
-                    // TODO add port to subsig[i] (output) and sig (input)
+                    string chName("channel_" + to_string(chCount));
                     stringstream srcActor;
                     stringstream dstActor;
                     srcActor << subsig[i];
                     dstActor << sig;
-                    string srcPortName("out_" + srcActor.str());
-                    string dstPortName("in_" + dstActor.str());
+                    string srcPortName("in_" + chName);
+                    string dstPortName("out_" + chName);
                     actorList.at(srcActor.str()).addPort(Port(srcPortName,
                                                               portType::out,
                                                               1));
                     actorList.at(dstActor.str()).addPort(Port(dstPortName,
                                                               portType::in,
                                                               1));
+                    chList.insert(pair<string, Channel>(chName,
+                                                        Channel(chName,
+                                                                srcActor.str(), srcPortName,
+                                                                dstActor.str(), dstPortName,
+                                                                1, 0))); // don't really know the right settings for this yet
+                    chCount++;
                 }
             }
         }

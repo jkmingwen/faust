@@ -37,3 +37,28 @@ private:
     string type; // describes what the actor does
     vector<Port> ports;
 };
+
+class Channel {
+public:
+    Channel(string name,
+            string srcActor, string srcPort,
+            string dstActor, string dstPort,
+            int size, int initialTokens);
+    Channel(string name,
+            string srcActor, string srcPort,
+            string dstActor, string dstPort);
+    string getName();
+    string getSrcActor();
+    string getDstActor();
+    string getSrcPort();
+    string getDstPort();
+    void printInfo();
+private:
+    string name;
+    string srcActor;
+    string dstActor;
+    string srcPort;
+    string dstPort;
+    int size;
+    int initialTokens;
+};
