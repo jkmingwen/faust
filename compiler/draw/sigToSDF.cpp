@@ -41,8 +41,31 @@ void sigToSDF(Tree L, ofstream& fout)
     map<string, Actor> actorList;
     map<string, Channel> chList;
     int chCount = 0;
+    int outCount = 0;
     while (isList(L)) {
         recdraw(hd(L), alreadyDrawn, fout, actorList, chList, chCount);
+        // add output node (and related ports/channels) to relevant lists
+        string outName("OUTPUT_" + to_string(outCount));
+        actorList.insert(pair<string, Actor>(outName,
+                                             Actor(outName, outName)));
+        stringstream srcActor;
+        srcActor << hd(L);
+        string chName("channel_" + to_string(chCount));
+        string srcPortName("in_" + chName);
+        string dstPortName("out_" + chName);
+        actorList.at(srcActor.str()).addPort(Port(srcPortName,
+                                                  portType::out,
+                                                  1));
+        actorList.at(outName).addPort(Port(dstPortName,
+                                           portType::in,
+                                           1));
+        chList.insert(pair<string, Channel>(chName,
+                                            Channel(chName,
+                                                    srcActor.str(), srcPortName,
+                                                    outName, dstPortName,
+                                                    1, 0)));
+        chCount++;
+        outCount++;
         L = tl(L);
     }
     for (auto& a : actorList) {
