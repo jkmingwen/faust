@@ -22,21 +22,6 @@ using namespace std;
 void sigToSDF(Tree L, ofstream& fout)
 {
     set<Tree> alreadyDrawn;
-    // TODO add proper tabulation
-    fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-         << "<sdf3 type=\"sdf\" version=\"1.0\"\n"
-         << "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
-         << "    xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
-         << endl;
-    fout << "<applicationGraph name='test'>" << endl;
-    fout << "    <sdf name='test' type='test'>" << endl;
-    // TODO write graph information (actor/channel names, ports)
-    fout << "    </sdf>" << endl;
-    fout << "    <sdfProperties>" << endl;
-    // TODO write graph properties (actor properties - processor and exec times)
-    fout << "    </sdfProperties>" << endl;
-    fout << "</applicationGraph>" << endl;
-    fout << "</sdf3>" << endl;
     
     map<string, Actor> actorList;
     map<string, Channel> chList;
@@ -68,16 +53,38 @@ void sigToSDF(Tree L, ofstream& fout)
         outCount++;
         L = tl(L);
     }
+    // for (auto& a : actorList) {
+    //     a.second.printInfo();
+    // }
+    // for (auto& c : chList) {
+    //     c.second.printInfo();
+    // }
+
+    // Write graph information to XML
+    fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+         << "<sdf3 type=\"sdf\" version=\"1.0\"\n"
+         << "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+         << "    xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
+         << endl;
+    fout << "<applicationGraph name='test'>" << endl;
+    fout << "    <sdf name='test' type='test'>" << endl;
+    // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
-        a.second.printInfo();
+        a.second.writeToXML(fout);
     }
     for (auto& c : chList) {
-        c.second.printInfo();
+        c.second.writeToXML(fout);
     }
+    fout << "    </sdf>\n" << endl;
+    fout << "    <sdfProperties>" << endl;
+    // TODO write graph properties (actor properties - processor and exec times)
+    fout << "    </sdfProperties>" << endl;
+    fout << "</applicationGraph>" << endl;
+    fout << "</sdf3>" << endl;
 }
 
 /**
- * Draw recursively a signal
+ * Recursively traverse signal and log actors, channels, and ports
  */
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                    map<string, Channel>& chList, int& chCount)

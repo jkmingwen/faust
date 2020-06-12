@@ -30,6 +30,7 @@ public:
     void addPort(Port);
     string getName();
     string getType();
+    void writeToXML(ofstream& fout);
     void printInfo(); // for debugging
     
 private:
@@ -52,6 +53,9 @@ public:
     string getDstActor();
     string getSrcPort();
     string getDstPort();
+    int getSize();
+    int getInitialTokens();
+    void writeToXML(ofstream& fout);
     void printInfo();
 private:
     string name;

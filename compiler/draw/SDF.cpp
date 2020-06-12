@@ -67,6 +67,19 @@ string Actor::getType()
     return this->type;
 }
 
+void Actor::writeToXML(ofstream& fout)
+{
+    fout << "        <actor name='" << this->getName()
+         << "' type='" << this->getType() << "'>" << endl;
+    for (auto p : this->ports) {
+        fout << "            <port type='" << p.getType()
+             << "' name='" << p.getName()
+             << "' rate='" << p.getRate()
+             << "'/>" << endl;
+    }
+    fout << "        </actor>" << endl;
+}
+
 void Actor::printInfo()
 {
     std::cout << "Actor name, type: " << this->getName() << ", " << this->getType() << std::endl;
@@ -123,6 +136,28 @@ string Channel::getSrcPort()
 string Channel::getDstPort()
 {
     return this->dstPort;
+}
+
+int Channel::getSize()
+{
+    return this->size;
+}
+
+int Channel::getInitialTokens()
+{
+    return this->initialTokens;
+}
+
+void Channel::writeToXML(ofstream& fout)
+{
+    fout << "        <channel name='" << this->getName()
+         << "' srcActor='" << this->getSrcActor()
+         << "' srcPort='" << this->getSrcPort()
+         << "' dstActor='" << this->getDstActor()
+         << "' dstPort='" << this->getDstPort()
+         << "' size='" << this->getSize()
+         << "' initialTokens='" << this->getInitialTokens()
+         << "'/>" << endl;
 }
 
 void Channel::printInfo()
