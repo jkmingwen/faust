@@ -22,7 +22,7 @@ using namespace std;
 void sigToSDF(Tree L, ofstream& fout)
 {
     set<Tree> alreadyDrawn;
-    
+    // TODO add proper tabulation
     fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          << "<sdf3 type=\"sdf\" version=\"1.0\"\n"
          << "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
@@ -30,15 +30,14 @@ void sigToSDF(Tree L, ofstream& fout)
          << endl;
     fout << "<applicationGraph name='test'>" << endl;
     fout << "<sdf name='test' type='test'>" << endl;
-    // TODO actors port types (in/out), rates
-    // TODO channels source and destination actor, initial tokens
+    // TODO write graph information (actor/channel names, ports)
     fout << "</sdf>" << endl;
     fout << "<sdfProperties>" << endl;
-    // TODO actor properties (processor, execution time)
+    // TODO write graph properties (actor properties - processor and exec times)
     fout << "</sdfProperties>" << endl;
     fout << "</applicationGraph>" << endl;
     fout << "</sdf3>" << endl;
-    // cout << "Printing name" << endl;
+    
     map<string, Actor> actorList;
     map<string, Channel> chList;
     int chCount = 0;
@@ -75,7 +74,7 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
         } else {
             // draw the node
             fout << "<actor name='" << sigLabel(sig) << "'>" << endl;
-            // TODO Add actor to graph
+            // Add actor to graph
             stringstream actorName; // workaround to get unique actor names from signal
             actorName << sig;
             // Actor newActor = Actor(actorName.str(), sigLabel(sig));
