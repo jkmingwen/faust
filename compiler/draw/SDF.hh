@@ -13,7 +13,7 @@ public:
     void setType(portType);
     void setRate(int);
     string getName();
-    portType getType();
+    string getType();
     int getRate();
     
 private:

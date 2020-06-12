@@ -27,9 +27,14 @@ string Port::getName()
     return this->name;
 }
 
-portType Port::getType()
+string Port::getType()
 {
-    return this->type;
+    if (this->type == portType::in)
+        return "in";
+    else if (this->type == portType::out)
+        return "out";
+    else
+        return "ERROR: invalid port type detected";
 }
 
 int Port::getRate()
