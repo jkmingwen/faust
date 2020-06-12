@@ -78,6 +78,9 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "    </sdf>\n" << endl;
     fout << "    <sdfProperties>" << endl;
     // TODO write graph properties (actor properties - processor and exec times)
+    for (auto& a : actorList) {
+        a.second.writePropertiesToXML(fout);
+    }
     fout << "    </sdfProperties>" << endl;
     fout << "</applicationGraph>" << endl;
     fout << "</sdf3>" << endl;

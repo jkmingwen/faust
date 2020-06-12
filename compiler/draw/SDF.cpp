@@ -80,6 +80,15 @@ void Actor::writeToXML(ofstream& fout)
     fout << "        </actor>" << endl;
 }
 
+void Actor::writePropertiesToXML(ofstream& fout)
+{
+    fout << "        <actorProperties actor='" << this->getName() << "'>" << endl;
+    fout << "            <processor type='cluster_0' default='true'>" << endl;
+    fout << "                <executionTime time='1' />" << endl;
+    fout << "            </processor>" << endl;
+    fout << "        </actorProperties>" << endl;
+}
+
 void Actor::printInfo()
 {
     std::cout << "Actor name, type: " << this->getName() << ", " << this->getType() << std::endl;

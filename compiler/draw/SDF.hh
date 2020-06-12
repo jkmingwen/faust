@@ -31,6 +31,7 @@ public:
     string getName();
     string getType();
     void writeToXML(ofstream& fout);
+    void writePropertiesToXML(ofstream& fout);
     void printInfo(); // for debugging
     
 private:
