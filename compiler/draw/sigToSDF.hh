@@ -14,9 +14,8 @@ using namespace std;
  * SDF3-compatible XML format
  */
 void sigToSDF(Tree L, ofstream& fout);
-static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout,
-                    map<string, Actor>& actors, map<string, Channel>& channels,
-                    int& chCount);
+static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
+                   map<string, Channel>& channels, int& chCount);
 static string sigLabel(Tree sig);
 
 #endif  // SIGTOSDF_HH
