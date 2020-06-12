@@ -25,16 +25,16 @@ void sigToSDF(Tree L, ofstream& fout)
     // TODO add proper tabulation
     fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          << "<sdf3 type=\"sdf\" version=\"1.0\"\n"
-         << "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
-         << "xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
+         << "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+         << "    xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
          << endl;
     fout << "<applicationGraph name='test'>" << endl;
-    fout << "<sdf name='test' type='test'>" << endl;
+    fout << "    <sdf name='test' type='test'>" << endl;
     // TODO write graph information (actor/channel names, ports)
-    fout << "</sdf>" << endl;
-    fout << "<sdfProperties>" << endl;
+    fout << "    </sdf>" << endl;
+    fout << "    <sdfProperties>" << endl;
     // TODO write graph properties (actor properties - processor and exec times)
-    fout << "</sdfProperties>" << endl;
+    fout << "    </sdfProperties>" << endl;
     fout << "</applicationGraph>" << endl;
     fout << "</sdf3>" << endl;
     
