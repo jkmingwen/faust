@@ -70,6 +70,21 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "    <sdf name='test' type='test'>" << endl;
     // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
+        // add self loops
+        string srcPortName("in_R" + a.first);
+        string dstPortName("out_R" + a.first);
+        a.second.addPort(Port(srcPortName,
+                              portType::out,
+                              1));
+        a.second.addPort(Port(dstPortName,
+                              portType::in,
+                              1));
+        string chName("channel_" + a.first);
+        chList.insert(pair<string, Channel>(chName,
+                                            Channel(chName,
+                                                    a.first, srcPortName,
+                                                    a.first, dstPortName,
+                                                    1, 1)));
         a.second.writeToXML(fout);
     }
     for (auto& c : chList) {
@@ -77,7 +92,7 @@ void sigToSDF(Tree L, ofstream& fout)
     }
     fout << "    </sdf>\n" << endl;
     fout << "    <sdfProperties>" << endl;
-    // TODO write graph properties (actor properties - processor and exec times)
+    // Write actor properties
     for (auto& a : actorList) {
         a.second.writePropertiesToXML(fout);
     }
