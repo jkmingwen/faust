@@ -177,7 +177,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
 /**
  * translate signal binary operations into strings
  */
-static const char* binopname[] = {"+", "-", "*", "/", "%", "<<", ">>", ">", "<", ">=", "<=", "==", "!=", "&", "|", "^"};
+static const char* binopname[] = {"add", "diff", "prod", "div", "mod", "l_shift", "r_shift", "greaterthan", "lessthan", "geq", "leq", "equal", "notequal", "AND", "OR", "XOR"};
 
 /**
  * return the label of a signal as a string
@@ -210,7 +210,7 @@ static string sigLabel(Tree sig)
     else if (isSigDelay1(sig, x)) {
         fout << "mem";
     } else if (isSigFixDelay(sig, x, y)) {
-        fout << "@";
+        fout << "delay";
     } else if (isSigPrefix(sig, x, y)) {
         fout << "prefix";
     } else if (isSigIota(sig, x)) {
