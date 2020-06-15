@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include "signals.hh"
+#include "sigtype.hh"
 #include "SDF.hh"
 
 using namespace std;
@@ -16,6 +17,7 @@ using namespace std;
 void sigToSDF(Tree L, ofstream& fout);
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
                    map<string, Channel>& channels, int& chCount);
+static string chAttr(Type t);
 static string sigLabel(Tree sig);
 
 #endif  // SIGTOSDF_HH

@@ -35,7 +35,7 @@ void sigToSDF(Tree L, ofstream& fout)
                                              Actor(outName, outName)));
         stringstream srcActor;
         srcActor << hd(L);
-        string chName("channel_" + to_string(chCount));
+        string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(hd(L))));
         string srcPortName("in_" + chName);
         string dstPortName("out_" + chName);
         actorList.at(srcActor.str()).addPort(Port(srcPortName,
@@ -148,7 +148,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 for (int i = 0; i < n; i++) {
                     recLog(subsig[i], drawn, actorList, chList, chCount);
                     // log channels and corresponding ports for the connected actors
-                    string chName("channel_" + to_string(chCount));
+                    string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
                     stringstream srcActor;
                     stringstream dstActor;
                     srcActor << subsig[i];
@@ -172,6 +172,34 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
         }
     }
     // cerr << --gGlobal->TABBER << "EXIT REC DRAW OF " << sig << endl;
+}
+
+/**
+ * Return string of signal type
+ */
+static string chAttr(Type t)
+{
+    string s;
+
+    // nature
+    switch (t->nature()) {
+    case kInt:
+        s += "_int";
+        break;
+    case kReal:
+        s += "_real";
+        break;
+    default:
+        s+= "_nomatch";
+        break;
+    }
+    
+    // vectorability
+    if (t->vectorability() == kVect && t->variability() == kSamp) {
+        s += "_vect";
+    }
+
+    return s;
 }
 
 /**
