@@ -27,8 +27,9 @@ void sigToSDF(Tree L, ofstream& fout)
     map<string, Channel> chList;
     int chCount = 0;
     int outCount = 0;
+    vector<string> delayActors;
     while (isList(L)) {
-        recLog(hd(L), alreadyDrawn, actorList, chList, chCount);
+        recLog(hd(L), alreadyDrawn, actorList, chList, chCount, delayActors);
         // add output node (and related ports/channels) to relevant lists
         string outName("OUTPUT_" + to_string(outCount));
         actorList.insert(pair<string, Actor>(outName,
@@ -69,6 +70,11 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "<applicationGraph name='test'>" << endl;
     fout << "    <sdf name='test' type='test'>" << endl;
     // Write graph information (actor/channel names, ports)
+    for (auto& d : delayActors) {
+        // chList.insert(pair<string, Channel>("delay_replacement",
+        //                                     Channel()))
+        cout << "delay: " << d << endl;
+    }
     for (auto& a : actorList) {
         // add self loops
         string srcPortName("in_R" + a.first);
@@ -105,7 +111,8 @@ void sigToSDF(Tree L, ofstream& fout)
  * Recursively traverse signal and log actors, channels, and ports
  */
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
-                   map<string, Channel>& chList, int& chCount)
+                   map<string, Channel>& chList, int& chCount,
+                   vector<string>& delayActors)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -115,7 +122,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
         drawn.insert(sig);
         if (isList(sig)) {
             do {
-                recLog(hd(sig), drawn, actorList, chList, chCount);
+                recLog(hd(sig), drawn, actorList, chList, chCount, delayActors);
                 sig = tl(sig);
             } while (isList(sig));
         } else {
@@ -124,6 +131,20 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
             actorName << sig;
             actorList.insert(pair<string, Actor>(actorName.str(),
                                                  Actor(actorName.str(), sigLabel(sig))));
+            // TODO if sigLabel(sig) == "delay", then save name and don't add to actorList
+            Tree arg1, arg2;
+            int arg2_val;
+            if (isSigFixDelay(sig, arg1, arg2)) {
+                stringstream arg1_name;
+                stringstream arg2_name;
+                arg1_name << arg1;
+                arg2_name << arg2;
+                delayActors.push_back(actorName.str());
+                if (isSigInt(arg2, &arg2_val)) { // assign int value
+                }
+                actorList.at(actorName.str()).setInputSigName(arg1_name.str());
+                actorList.at(actorName.str()).setArg(arg2_name.str(), arg2_val);
+            }
 
             // draw the subsignals
             n = getSubSignals(sig, subsig);
@@ -146,13 +167,15 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 }
 
                 for (int i = 0; i < n; i++) {
-                    recLog(subsig[i], drawn, actorList, chList, chCount);
+                    recLog(subsig[i], drawn, actorList, chList, chCount, delayActors);
                     // log channels and corresponding ports for the connected actors
                     string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
                     stringstream srcActor;
                     stringstream dstActor;
                     srcActor << subsig[i];
                     dstActor << sig;
+                    // TODO if sigLabel(sig) == "delay" then add srcPort to srcActor but not dstPort/dstActor
+                    // TODO if sigLabel(subsig[i]) == "delay" then insert channel
                     string srcPortName("in_" + chName);
                     string dstPortName("out_" + chName);
                     actorList.at(srcActor.str()).addPort(Port(srcPortName,

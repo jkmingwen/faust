@@ -28,8 +28,12 @@ public:
     void setName(string);
     void setType(string);
     void addPort(Port);
+    void setInputSigName(string);
+    void setArg(string, int);
     string getName();
     string getType();
+    string getInputSigName();
+    pair<string, int> getArg();
     void writeToXML(ofstream& fout);
     void writePropertiesToXML(ofstream& fout);
     void printInfo(); // for debugging
@@ -38,6 +42,8 @@ private:
     string name; // unique identifier for actor
     string type; // describes what the actor does
     vector<Port> ports;
+    string inputSigName;
+    pair<string, int> args;
 };
 
 class Channel {
@@ -56,6 +62,7 @@ public:
     string getDstPort();
     int getSize();
     int getInitialTokens();
+    void setInitialTokens(int);
     void writeToXML(ofstream& fout);
     void printInfo();
 private:

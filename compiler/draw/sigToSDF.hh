@@ -16,7 +16,8 @@ using namespace std;
  */
 void sigToSDF(Tree L, ofstream& fout);
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
-                   map<string, Channel>& channels, int& chCount);
+                   map<string, Channel>& channels, int& chCount,
+                   vector<string>& delayList);
 static string chAttr(Type t);
 static string sigLabel(Tree sig);
 

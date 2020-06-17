@@ -57,6 +57,17 @@ void Actor::setType(string type)
     this->type = type;
 }
 
+void Actor::setInputSigName(string inputSig)
+{
+    this->inputSigName = inputSig;
+}
+
+void Actor::setArg(string argActorName, int value)
+{
+    this->args.first = argActorName;
+    this->args.second = value;
+}
+
 void Actor::addPort(Port newPort)
 {
     this->ports.push_back(newPort);
@@ -70,6 +81,16 @@ string Actor::getName()
 string Actor::getType()
 {
     return this->type;
+}
+
+string Actor::getInputSigName()
+{
+    return this->inputSigName;
+}
+
+pair<string, int> Actor::getArg()
+{
+    return this->args;
 }
 
 void Actor::writeToXML(ofstream& fout)
@@ -122,7 +143,7 @@ Channel::Channel(string name, string srcActor, string srcPort,
       dstActor{dstActor},
       srcPort{srcPort},
       dstPort{dstPort},
-      size{0},
+      size{1},
       initialTokens{0}
 {
 }
@@ -160,6 +181,11 @@ int Channel::getSize()
 int Channel::getInitialTokens()
 {
     return this->initialTokens;
+}
+
+void Channel::setInitialTokens(int nTokens)
+{
+    this->initialTokens = nTokens;
 }
 
 void Channel::writeToXML(ofstream& fout)
