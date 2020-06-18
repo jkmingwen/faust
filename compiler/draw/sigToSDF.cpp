@@ -54,12 +54,6 @@ void sigToSDF(Tree L, ofstream& fout)
         outCount++;
         L = tl(L);
     }
-    // for (auto& a : actorList) {
-    //     a.second.printInfo();
-    // }
-    // for (auto& c : chList) {
-    //     c.second.printInfo();
-    // }
 
     // Write graph information to XML
     fout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -69,7 +63,7 @@ void sigToSDF(Tree L, ofstream& fout)
          << endl;
     fout << "<applicationGraph name='test'>" << endl;
     fout << "    <sdf name='test' type='test'>" << endl;
-    // Write graph information (actor/channel names, ports)
+    // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
         string ch1 = channelNameFromActors(actorList.at(d).getInputSigName(),
                                            d, chList);
@@ -82,7 +76,12 @@ void sigToSDF(Tree L, ofstream& fout)
         }
         mergeChannels(ch1, ch2, chList);
         chList.at(ch1).setInitialTokens(actorList.at(d).getArg().second);
+        // remove delay actor and argument channel
+        string rmChannel = channelNameFromActors(actorList.at(d).getArg().first, d, chList);
+        chList.erase(chList.find(rmChannel));
+        actorList.erase(actorList.find(d));
     }
+    // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
         // add self loops
         string srcPortName("in_R" + a.first);
@@ -139,7 +138,6 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
             actorName << sig;
             actorList.insert(pair<string, Actor>(actorName.str(),
                                                  Actor(actorName.str(), sigLabel(sig))));
-            // TODO if sigLabel(sig) == "delay", then save name and don't add to actorList
             Tree arg1, arg2;
             int arg2_val;
             if (isSigFixDelay(sig, arg1, arg2)) {
@@ -182,8 +180,6 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                     stringstream dstActor;
                     srcActor << subsig[i];
                     dstActor << sig;
-                    // TODO if sigLabel(sig) == "delay" then add srcPort to srcActor but not dstPort/dstActor
-                    // TODO if sigLabel(subsig[i]) == "delay" then insert channel
                     string srcPortName("in_" + chName);
                     string dstPortName("out_" + chName);
                     actorList.at(srcActor.str()).addPort(Port(srcPortName,
@@ -196,7 +192,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                                                         Channel(chName,
                                                                 srcActor.str(), srcPortName,
                                                                 dstActor.str(), dstPortName,
-                                                                1, 0))); // don't really know the right settings for this yet
+                                                                1, 0)));
                     chCount++;
                 }
             }
