@@ -71,9 +71,19 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "    <sdf name='test' type='test'>" << endl;
     // Write graph information (actor/channel names, ports)
     for (auto& d : delayActors) {
-        // chList.insert(pair<string, Channel>("delay_replacement",
-        //                                     Channel()))
         cout << "delay: " << d << endl;
+        string ch1 = actorList.at(d).getInputSigName();
+        cout << "input actor is " << ch1 << endl;
+        cout << "channel between 2 actors is " << channelNameFromActors(ch1, d, chList) << endl;
+        // delay actors only have 1 output
+        string ch2;
+        for (auto p : actorList.at(d).getPorts()) {
+            if (p.getType() == "out") {
+                ch2 = p.getName();
+                cout << "output port is " << ch2 << endl;
+                cout << "channel of port is " << channelNameFromPort(p, chList) << endl;
+            }
+        }
     }
     for (auto& a : actorList) {
         // add self loops
@@ -344,4 +354,41 @@ static string sigLabel(Tree sig)
     }
 
     return fout.str();
+}
+
+// combine two channels in channel list
+void mergeChannels(string ch1, string ch2, map<string, Channel>& chList)
+{
+    chList.at(ch1).setDstActor(chList.at(ch2).getDstActor());
+    chList.at(ch1).setDstPort(chList.at(ch2).getDstPort());
+    // retain ch1 in list
+    chList.erase(chList.find(ch2));
+}
+
+// identify channel name based on an input or output port
+string channelNameFromPort(Port port, map<string, Channel>& chList)
+{
+    for (auto& c : chList) {
+        if (port.getType() == "in") {
+            if (port.getName() == c.second.getDstPort()) {
+                return c.second.getName();
+            }
+        } else if (port.getType() == "out") {
+            if (port.getName() == c.second.getSrcPort()) {
+                return c.second.getName();
+            }
+        }
+    }
+    return "ERROR: no matching channel";
+}
+
+// identify name of channel between two actors
+string channelNameFromActors(string srcActor, string dstActor, map<string, Channel>& chList)
+{
+    for (auto& c : chList) {
+        if (c.second.getSrcActor() == srcActor && c.second.getDstActor() == dstActor) {
+            return c.second.getName();
+        }
+    }
+    return "ERROR no matching channel";
 }

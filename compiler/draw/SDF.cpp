@@ -83,6 +83,11 @@ string Actor::getType()
     return this->type;
 }
 
+vector<Port> Actor::getPorts()
+{
+    return this->ports;
+}
+
 string Actor::getInputSigName()
 {
     return this->inputSigName;
@@ -146,6 +151,26 @@ Channel::Channel(string name, string srcActor, string srcPort,
       size{1},
       initialTokens{0}
 {
+}
+
+void Channel::setSrcActor(string srcActorName)
+{
+    this->srcActor = srcActorName;
+}
+
+void Channel::setDstActor(string dstActorName)
+{
+    this->dstActor = dstActorName;
+}
+
+void Channel::setSrcPort(string srcPortName)
+{
+    this->srcPort = srcPortName;
+}
+
+void Channel::setDstPort(string dstPortName)
+{
+    this->dstPort = dstPortName;
 }
 
 string Channel::getName()

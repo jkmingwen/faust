@@ -20,5 +20,8 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
                    vector<string>& delayList);
 static string chAttr(Type t);
 static string sigLabel(Tree sig);
-
+void mergeChannels(string ch1, string ch2, map<string, Channel>& chList);
+string channelNameFromPort(Port port, map<string, Channel>& chList);
+string channelNameFromActors(string srcActor, string dstActor,
+                             map<string, Channel>& chList);
 #endif  // SIGTOSDF_HH

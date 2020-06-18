@@ -32,6 +32,7 @@ public:
     void setArg(string, int);
     string getName();
     string getType();
+    vector<Port> getPorts();
     string getInputSigName();
     pair<string, int> getArg();
     void writeToXML(ofstream& fout);
@@ -55,6 +56,10 @@ public:
     Channel(string name,
             string srcActor, string srcPort,
             string dstActor, string dstPort);
+    void setSrcActor(string);
+    void setDstActor(string);
+    void setSrcPort(string);
+    void setDstPort(string);
     string getName();
     string getSrcActor();
     string getDstActor();
