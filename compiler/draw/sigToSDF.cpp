@@ -71,19 +71,17 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "    <sdf name='test' type='test'>" << endl;
     // Write graph information (actor/channel names, ports)
     for (auto& d : delayActors) {
-        cout << "delay: " << d << endl;
-        string ch1 = actorList.at(d).getInputSigName();
-        cout << "input actor is " << ch1 << endl;
-        cout << "channel between 2 actors is " << channelNameFromActors(ch1, d, chList) << endl;
+        string ch1 = channelNameFromActors(actorList.at(d).getInputSigName(),
+                                           d, chList);
         // delay actors only have 1 output
         string ch2;
         for (auto p : actorList.at(d).getPorts()) {
             if (p.getType() == "out") {
-                ch2 = p.getName();
-                cout << "output port is " << ch2 << endl;
-                cout << "channel of port is " << channelNameFromPort(p, chList) << endl;
+                ch2 = channelNameFromPort(p, chList);
             }
         }
+        mergeChannels(ch1, ch2, chList);
+        chList.at(ch1).setInitialTokens(actorList.at(d).getArg().second);
     }
     for (auto& a : actorList) {
         // add self loops
