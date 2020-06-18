@@ -77,9 +77,13 @@ void sigToSDF(Tree L, ofstream& fout)
         mergeChannels(ch1, ch2, chList);
         chList.at(ch1).setInitialTokens(actorList.at(d).getArg().second);
         // remove delay actor and argument channel
-        string rmChannel = channelNameFromActors(actorList.at(d).getArg().first, d, chList);
+        string argActorName = actorList.at(d).getArg().first;
+        string rmChannel = channelNameFromActors(argActorName, d, chList);
         chList.erase(chList.find(rmChannel));
         actorList.erase(actorList.find(d));
+        if (actorList.at(argActorName).getPorts().size() == 1) { // if argument actor is purely for delay
+            actorList.erase(actorList.find(argActorName));
+        }
     }
     // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
