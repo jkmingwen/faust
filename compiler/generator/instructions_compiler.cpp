@@ -192,7 +192,6 @@ Tree InstructionsCompiler::prepare(Tree LS)
     }
 
     if (gGlobal->gPrintSDFSwitch) {
-        cout << "SDF Switch = TRUE" << endl;
         ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
         sigToSDF(L5, xmlfile);
     }
