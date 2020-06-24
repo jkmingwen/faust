@@ -67,15 +67,9 @@ void sigToSDF(Tree L, ofstream& fout)
     for (auto& d : delayActors) {
         string ch1 = channelNameFromActors(actorList.at(d).getInputSigName(),
                                            d, chList);
-        // delay actors only have 1 output
-        string ch2;
-        for (auto p : actorList.at(d).getPorts()) {
-            if (p.getType() == "out") {
-                ch2 = channelNameFromPort(p, chList);
-            }
-        }
-        mergeChannels(ch1, ch2, chList);
-        chList.at(ch1).setInitialTokens(actorList.at(d).getArg().second);
+        bypassDelay(d, actorList.at(d).getInputSigName(), chList, actorList);
+        actorList.at(actorList.at(d).getInputSigName()).removePort(chList.at(ch1).getSrcPort());
+        chList.erase(chList.find(ch1));
         // remove delay actor and argument channel
         string argActorName = actorList.at(d).getArg().first;
         string rmChannel = channelNameFromActors(argActorName, d, chList);
@@ -361,6 +355,21 @@ void mergeChannels(string ch1, string ch2, map<string, Channel>& chList)
     chList.at(ch1).setDstPort(chList.at(ch2).getDstPort());
     // retain ch1 in list
     chList.erase(chList.find(ch2));
+}
+
+// modify a channel to bypass the given delay actor
+void bypassDelay(string delayActorName, string inputActorName,
+                 map<string, Channel>& chList, map<string, Actor>& actorList)
+{
+    int delayArg = actorList.at(delayActorName).getArg().second;
+    for (auto& p : actorList.at(delayActorName).getPorts()) {
+        if (p.getType() == "out") {
+            string channelToMod = channelNameFromPort(p, chList);
+            actorList.at(inputActorName).addPort(p);
+            chList.at(channelToMod).setSrcActor(inputActorName);
+            chList.at(channelToMod).setInitialTokens(delayArg);
+        }
+    }
 }
 
 // identify channel name based on an input or output port

@@ -73,6 +73,15 @@ void Actor::addPort(Port newPort)
     this->ports.push_back(newPort);
 }
 
+void Actor::removePort(string portName)
+{
+    for (unsigned i = 0; i < this->ports.size(); i++) {
+        if (this->ports[i].getName() == portName) {
+            this->ports.erase(this->ports.begin() + i);
+        }
+    }
+}
+
 string Actor::getName()
 {
     return this->name;
@@ -133,8 +142,8 @@ Channel::Channel(string name, string srcActor, string srcPort,
                  int size, int initialTokens)
     : name{name},
       srcActor{srcActor},
-      dstActor{dstActor},
       srcPort{srcPort},
+      dstActor{dstActor},
       dstPort{dstPort},
       size{size},
       initialTokens{initialTokens}
@@ -145,8 +154,8 @@ Channel::Channel(string name, string srcActor, string srcPort,
                  string dstActor, string dstPort)
     : name{name},
       srcActor{srcActor},
-      dstActor{dstActor},
       srcPort{srcPort},
+      dstActor{dstActor},
       dstPort{dstPort},
       size{1},
       initialTokens{0}

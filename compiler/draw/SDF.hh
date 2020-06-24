@@ -28,6 +28,7 @@ public:
     void setName(string);
     void setType(string);
     void addPort(Port);
+    void removePort(string);
     void setInputSigName(string);
     void setArg(string, int);
     string getName();

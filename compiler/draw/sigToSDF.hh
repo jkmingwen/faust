@@ -21,6 +21,8 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
 static string chAttr(Type t);
 static string sigLabel(Tree sig);
 void mergeChannels(string ch1, string ch2, map<string, Channel>& chList);
+void bypassDelay(string delayActorName, string inputActorName,
+                 map<string, Channel>& chList, map<string, Actor>& actorList);
 string channelNameFromPort(Port port, map<string, Channel>& chList);
 string channelNameFromActors(string srcActor, string dstActor,
                              map<string, Channel>& chList);
