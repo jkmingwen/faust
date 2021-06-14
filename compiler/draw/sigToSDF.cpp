@@ -28,6 +28,7 @@ void sigToSDF(Tree L, ofstream& fout)
     int chCount = 0;
     int outCount = 0;
     vector<string> delayActors;
+    const string graphName = gGlobal->gMasterName; // name of .dsp file
     while (isList(L)) {
         recLog(hd(L), alreadyDrawn, actorList, chList, chCount, delayActors);
         // add output node (and related ports/channels) to relevant lists
@@ -61,8 +62,8 @@ void sigToSDF(Tree L, ofstream& fout)
          << "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
          << "    xsi:noNamespaceSchemaLocation=\"http://www.es.ele.tue.nl/sdf3/xsd/sdf3-csdf.xsd\">"
          << endl;
-    fout << "<applicationGraph name='test'>" << endl;
-    fout << "    <sdf name='test' type='test'>" << endl;
+    fout << "<applicationGraph name='" << graphName << "'>" << endl;
+    fout << "    <sdf name='" << graphName << "' type='" << graphName << "'>" << endl;
     // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
         string ch1 = channelNameFromActors(actorList.at(d).getInputSigName(),
