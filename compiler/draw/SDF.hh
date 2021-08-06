@@ -15,7 +15,7 @@ public:
     string getName();
     string getType();
     int getRate();
-    
+
 private:
     string name;
     portType type;
@@ -29,22 +29,22 @@ public:
     void setType(string);
     void addPort(Port);
     void removePort(string);
-    void setInputSigName(string);
+    void setDelayInputSigName(string);
     void setArg(string, int);
     string getName();
     string getType();
     vector<Port> getPorts();
-    string getInputSigName();
+    string getDelayInputSigName();
     pair<string, int> getArg();
     void writeToXML(ofstream& fout);
     void writePropertiesToXML(ofstream& fout);
     void printInfo(); // for debugging
-    
+
 private:
     string name; // unique identifier for actor
     string type; // describes what the actor does
     vector<Port> ports;
-    string inputSigName;
+    string delayInputSigName;
     pair<string, int> args;
 };
 

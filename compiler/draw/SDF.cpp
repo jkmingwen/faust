@@ -57,9 +57,9 @@ void Actor::setType(string type)
     this->type = type;
 }
 
-void Actor::setInputSigName(string inputSig)
+void Actor::setDelayInputSigName(string inputSig)
 {
-    this->inputSigName = inputSig;
+    this->delayInputSigName = inputSig;
 }
 
 void Actor::setArg(string argActorName, int value)
@@ -97,9 +97,9 @@ vector<Port> Actor::getPorts()
     return this->ports;
 }
 
-string Actor::getInputSigName()
+string Actor::getDelayInputSigName()
 {
-    return this->inputSigName;
+    return this->delayInputSigName;
 }
 
 pair<string, int> Actor::getArg()

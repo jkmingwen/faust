@@ -66,10 +66,10 @@ void sigToSDF(Tree L, ofstream& fout)
     fout << "    <sdf name='" << graphName << "' type='" << graphName << "'>" << endl;
     // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
-        string ch1 = channelNameFromActors(actorList.at(d).getInputSigName(),
+        string ch1 = channelNameFromActors(actorList.at(d).getDelayInputSigName(),
                                            d, chList);
-        bypassDelay(d, actorList.at(d).getInputSigName(), chList, actorList);
-        actorList.at(actorList.at(d).getInputSigName()).removePort(chList.at(ch1).getSrcPort());
+        bypassDelay(d, actorList.at(d).getDelayInputSigName(), chList, actorList);
+        actorList.at(actorList.at(d).getDelayInputSigName()).removePort(chList.at(ch1).getSrcPort());
         chList.erase(chList.find(ch1));
         // remove delay actor and argument channel
         string argActorName = actorList.at(d).getArg().first;
@@ -147,7 +147,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 delayActors.push_back(actorName.str());
                 if (isSigInt(arg2, &arg2_val)) { // assign int value
                 }
-                actorList.at(actorName.str()).setInputSigName(arg1_name.str());
+                actorList.at(actorName.str()).setDelayInputSigName(arg1_name.str());
                 actorList.at(actorName.str()).setArg(arg2_name.str(), arg2_val);
             }
 
