@@ -64,19 +64,31 @@ void sigToSDF(Tree L, ofstream& fout)
          << endl;
     fout << "<applicationGraph name='" << graphName << "'>" << endl;
     fout << "    <sdf name='" << graphName << "' type='" << graphName << "'>" << endl;
+    // // Remove REC actors for SDF
+    // for (auto& r : recActors) { // TODO check what information is already stored for recursive actors
+    //   cout << "Rec Actor name: " << r << endl;
+    //   bypassRec(r, actorList.at(r).getInputSignalNames(), chList, actorList);
+    // }
     // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
         string ch1 = channelNameFromActors(actorList.at(d).getDelayInputSigName(),
                                            d, chList);
+        cout << "Bypassing delay: " << d << endl;
         bypassDelay(d, actorList.at(d).getDelayInputSigName(), chList, actorList);
+        cout << "\tRemoving original source port of channel " << ch1 << endl;
         actorList.at(actorList.at(d).getDelayInputSigName()).removePort(chList.at(ch1).getSrcPort());
         chList.erase(chList.find(ch1));
         // remove delay actor and argument channel
         string argActorName = actorList.at(d).getArg().first;
         string rmChannel = channelNameFromActors(argActorName, d, chList);
+        cout << "\tRemoving channel: " << rmChannel << endl;
+        cout << "\t\tRemoving port: " << chList.at(rmChannel).getSrcPort() << endl;
+        actorList.at(argActorName).removePort(chList.at(rmChannel).getSrcPort());
         chList.erase(chList.find(rmChannel));
+        cout << "\t\tNumber of ports left for " << argActorName << ": "
+             << actorList.at(argActorName).getPorts().size() << endl;
         actorList.erase(actorList.find(d));
-        if (actorList.at(argActorName).getPorts().size() == 1) { // if argument actor is purely for delay
+        if (actorList.at(argActorName).getPorts().size() == 0) { // if argument actor is purely for delay
             actorList.erase(actorList.find(argActorName));
         }
     }
