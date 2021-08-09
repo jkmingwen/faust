@@ -17,12 +17,14 @@ using namespace std;
 void sigToSDF(Tree L, ofstream& fout);
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
                    map<string, Channel>& channels, int& chCount,
-                   vector<string>& delayList);
+                   vector<string>& delayList, vector<string>& recList); // store delay ('@') and recursive actors ('REC WN') in their own vectors
 static string chAttr(Type t);
 static string sigLabel(Tree sig);
 void mergeChannels(string ch1, string ch2, map<string, Channel>& chList);
 void bypassDelay(string delayActorName, string inputActorName,
                  map<string, Channel>& chList, map<string, Actor>& actorList);
+void bypassRec(string recActorName, vector<string> inputSignalNames,
+               map<string, Channel>& chList, map<string, Actor>& actorList);
 string channelNameFromPort(Port port, map<string, Channel>& chList);
 string channelNameFromActors(string srcActor, string dstActor,
                              map<string, Channel>& chList);

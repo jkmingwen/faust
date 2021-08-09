@@ -31,11 +31,13 @@ public:
     void removePort(string);
     void setDelayInputSigName(string);
     void setArg(string, int);
+    void addInputSignalName(string);
     string getName();
     string getType();
     vector<Port> getPorts();
     string getDelayInputSigName();
     pair<string, int> getArg();
+    vector<string> getInputSignalNames();
     void writeToXML(ofstream& fout);
     void writePropertiesToXML(ofstream& fout);
     void printInfo(); // for debugging
@@ -44,8 +46,9 @@ private:
     string name; // unique identifier for actor
     string type; // describes what the actor does
     vector<Port> ports;
-    string delayInputSigName;
+    string delayInputSigName; // track input signals for delay operator in order to bypass it in SDF representation
     pair<string, int> args;
+    vector<string> inputSignals; // track list of input signals for rec operator in order to bypass it in SDF representation
 };
 
 class Channel {

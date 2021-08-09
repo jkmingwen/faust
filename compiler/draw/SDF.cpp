@@ -68,6 +68,10 @@ void Actor::setArg(string argActorName, int value)
     this->args.second = value;
 }
 
+void Actor::addInputSignalName(string name) {
+    this->inputSignals.push_back(name);
+}
+
 void Actor::addPort(Port newPort)
 {
     this->ports.push_back(newPort);
@@ -105,6 +109,10 @@ string Actor::getDelayInputSigName()
 pair<string, int> Actor::getArg()
 {
     return this->args;
+}
+
+vector<string> Actor::getInputSignalNames() {
+    return this->inputSignals;
 }
 
 void Actor::writeToXML(ofstream& fout)

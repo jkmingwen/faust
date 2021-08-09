@@ -1,5 +1,5 @@
+#include <assert.h>
 #include <stdio.h>
-
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -16,21 +16,23 @@
 using namespace std;
 
 /**
- * Draw a list of signals as a synchronous dataflow graph using 
+ * Draw a list of signals as a synchronous dataflow graph using
  * SDF3-compatible XML format
  */
 void sigToSDF(Tree L, ofstream& fout)
 {
     set<Tree> alreadyDrawn;
-    
+
     map<string, Actor> actorList;
     map<string, Channel> chList;
     int chCount = 0;
     int outCount = 0;
     vector<string> delayActors;
+    vector<string> recActors;
     const string graphName = gGlobal->gMasterName; // name of .dsp file
     while (isList(L)) {
-        recLog(hd(L), alreadyDrawn, actorList, chList, chCount, delayActors);
+        recLog(hd(L), alreadyDrawn, actorList, chList, chCount,
+               delayActors, recActors);
         // add output node (and related ports/channels) to relevant lists
         string outName("OUTPUT_" + to_string(outCount));
         actorList.insert(pair<string, Actor>(outName,
@@ -64,18 +66,25 @@ void sigToSDF(Tree L, ofstream& fout)
          << endl;
     fout << "<applicationGraph name='" << graphName << "'>" << endl;
     fout << "    <sdf name='" << graphName << "' type='" << graphName << "'>" << endl;
-    // // Remove REC actors for SDF
-    // for (auto& r : recActors) { // TODO check what information is already stored for recursive actors
-    //   cout << "Rec Actor name: " << r << endl;
-    //   bypassRec(r, actorList.at(r).getInputSignalNames(), chList, actorList);
-    // }
+    // Bypass REC actors for SDF
+    for (auto& r : recActors) {
+      vector<string> inputActorNames = actorList.at(r).getInputSignalNames();
+      bypassRec(r, inputActorNames, chList, actorList);
+      // remove bypassed channels
+      for (auto& i : inputActorNames) {
+        string channelToRemove = channelNameFromActors(i, r, chList);
+        actorList.at(i).removePort(chList.at(channelToRemove).getSrcPort());
+        chList.erase(chList.find(channelToRemove));
+      }
+      // remove recursive actor
+      actorList.erase(actorList.find(r));
+    }
     // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
+        // remove bypassed channel
         string ch1 = channelNameFromActors(actorList.at(d).getDelayInputSigName(),
                                            d, chList);
-        cout << "Bypassing delay: " << d << endl;
         bypassDelay(d, actorList.at(d).getDelayInputSigName(), chList, actorList);
-        cout << "\tRemoving original source port of channel " << ch1 << endl;
         actorList.at(actorList.at(d).getDelayInputSigName()).removePort(chList.at(ch1).getSrcPort());
         chList.erase(chList.find(ch1));
         // remove delay actor and argument channel
@@ -88,7 +97,8 @@ void sigToSDF(Tree L, ofstream& fout)
         cout << "\t\tNumber of ports left for " << argActorName << ": "
              << actorList.at(argActorName).getPorts().size() << endl;
         actorList.erase(actorList.find(d));
-        if (actorList.at(argActorName).getPorts().size() == 0) { // if argument actor is purely for delay
+        // Remove argument actor if it's found to be purely for delay
+        if (actorList.at(argActorName).getPorts().size() == 0) {
             actorList.erase(actorList.find(argActorName));
         }
     }
@@ -130,7 +140,7 @@ void sigToSDF(Tree L, ofstream& fout)
  */
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                    map<string, Channel>& chList, int& chCount,
-                   vector<string>& delayActors)
+                   vector<string>& delayActors, vector<string>& recActors)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -140,7 +150,8 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
         drawn.insert(sig);
         if (isList(sig)) {
             do {
-                recLog(hd(sig), drawn, actorList, chList, chCount, delayActors);
+                recLog(hd(sig), drawn, actorList, chList, chCount,
+                       delayActors, recActors);
                 sig = tl(sig);
             } while (isList(sig));
         } else {
@@ -169,7 +180,37 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 if (n == 1 && isList(subsig[0])) {
                     Tree id, body;
                     faustassert(isRec(sig, id, body));
-                    if (!isRec(sig, id, body)) {
+                    if (isRec(sig, id, body)) {
+                      recActors.push_back(actorName.str());
+                      for (auto& b : body->branches()) {
+                        if (b->node() == "cons") { // NOTE when one input of REC WN is delay, the other is a node "cons" --- need to check branches of cons to retrieve name of input actor
+                          for (auto& next : b->branches()) {
+                            // NOTE found that each input signal of a REC WN
+                            // operator is accompanied by a node with the following
+                            // properties: arity = 0, serial = 35, node = nil
+                            // cout << "\tnode: " << next->node() << endl;
+                            // don't add "nil" nodes
+                            if (next->arity() != 0 && next->serial() != 35 && next->node() != "nil") {
+                              stringstream sigName;
+                              sigName << next;
+                              // cout << "\t\tAdding " << next->node() << "(" << sigName.str() << ") as input signal of " << actorName.str() << endl;
+                              actorList.at(actorName.str()).addInputSignalName(sigName.str());
+                            } else if (next->node() == "cons") { // TODO implement this recursively to support nested REC WN
+                              cout << "triple-nested recursion loops not currently supported: error in output" << endl;
+                            }
+                          }
+                        } else {
+                          // only add input signals that aren't 'nil' signals
+                          if (b->arity() != 0 && b->serial() != 35 && b->node() != "nil") {
+                            stringstream sigName;
+                            sigName << b;
+                            // cout << "Adding " << sigName.str() << " as input signal of " << actorName.str() << endl;
+                            // cout << "\tnode: " << b->node() << endl;
+                            actorList.at(actorName.str()).addInputSignalName(sigName.str());
+                          }
+                        }
+                      }
+                    } else {
                     }
                     // special recursion case, recreate a vector of subsignals instead of the
                     // list provided by getSubSignal
@@ -184,7 +225,8 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 }
 
                 for (int i = 0; i < n; i++) {
-                    recLog(subsig[i], drawn, actorList, chList, chCount, delayActors);
+                    recLog(subsig[i], drawn, actorList, chList, chCount,
+                           delayActors, recActors);
                     // log channels and corresponding ports for the connected actors
                     string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
                     stringstream srcActor;
@@ -231,7 +273,7 @@ static string chAttr(Type t)
         s+= "_nomatch";
         break;
     }
-    
+
     // vectorability
     if (t->vectorability() == kVect && t->variability() == kSamp) {
         s += "_vect";
@@ -321,14 +363,14 @@ static string sigLabel(Tree sig)
         fout << "float";
     }
 #if 0
-    else if ( isSigButton(sig, label) ) 			{ fout << "button \"" << *label << '"'; }
-    else if ( isSigCheckbox(sig, label) ) 			{ fout << "checkbox \"" << *label << '"'; }
+    else if ( isSigButton(sig, label) )                         { fout << "button \"" << *label << '"'; }
+    else if ( isSigCheckbox(sig, label) )                       { fout << "checkbox \"" << *label << '"'; }
     else if ( isSigVSlider(sig, label,c,x,y,z) )	{ fout << "vslider \"" << *label << '"';  }
     else if ( isSigHSlider(sig, label,c,x,y,z) )	{ fout << "hslider \"" << *label << '"';  }
     else if ( isSigNumEntry(sig, label,c,x,y,z) )	{ fout << "nentry \"" << *label << '"';  }
-    
-    else if ( isSigVBargraph(sig, label,x,y,z) )	{ fout << "vbargraph \"" << *label << '"'; 	}
-    else if ( isSigHBargraph(sig, label,x,y,z) )	{ fout << "hbargraph \"" << *label << '"'; 	}
+
+    else if ( isSigVBargraph(sig, label,x,y,z) )	{ fout << "vbargraph \"" << *label << '"';      }
+    else if ( isSigHBargraph(sig, label,x,y,z) )	{ fout << "hbargraph \"" << *label << '"';      }
 #else
     else if (isSigButton(sig, label)) {
         fout << "button";
@@ -375,6 +417,7 @@ void bypassDelay(string delayActorName, string inputActorName,
                  map<string, Channel>& chList, map<string, Actor>& actorList)
 {
     int delayArg = actorList.at(delayActorName).getArg().second;
+    // connect the input actor to the destination of the delay signal
     for (auto& p : actorList.at(delayActorName).getPorts()) {
         if (p.getType() == "out") {
             string channelToMod = channelNameFromPort(p, chList);
@@ -383,6 +426,24 @@ void bypassDelay(string delayActorName, string inputActorName,
             chList.at(channelToMod).setInitialTokens(delayArg);
         }
     }
+}
+
+// modify a channel to bypass the given REC actor
+void bypassRec(string recActorName, vector<string> inputSignalNames,
+               map<string, Channel>& chList, map<string, Actor>& actorList) {
+  vector<Port> outputPorts;
+  for (auto& p : actorList.at(recActorName).getPorts()) {
+    if (p.getType() == "out") {
+      outputPorts.push_back(p);
+    }
+  }
+  assert(outputPorts.size() == inputSignalNames.size()); // rec signals must have matching input and output signal numbers
+  // randomly assign inputs to outputs TODO figure out actual mapping of this
+  for (size_t i = 0; i < outputPorts.size(); i++) {
+    string channelToMod = channelNameFromPort(outputPorts[i], chList);
+    actorList.at(inputSignalNames[i]).addPort(outputPorts[i]);
+    chList.at(channelToMod).setSrcActor(inputSignalNames[i]); // connect output channel of REC to one of its input actors
+  }
 }
 
 // identify channel name based on an input or output port
