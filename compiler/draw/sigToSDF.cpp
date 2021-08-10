@@ -352,7 +352,7 @@ static string sigLabel(Tree sig)
     }
 
     else if (isProj(sig, &i, x)) {
-        fout << "Proj" << i;
+        fout << "Proj";
     } else if (isRec(sig, var, le)) {
         fout << "REC " << *var;
     }
