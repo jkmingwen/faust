@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -113,6 +114,12 @@ pair<string, int> Actor::getArg()
 
 vector<string> Actor::getInputSignalNames() {
     return this->inputSignals;
+}
+
+// replace old signal name with new signal name (order must be retained)
+void Actor::replaceInputSignalName(string oldName, string newName) {
+  std::replace(this->inputSignals.begin(), this->inputSignals.end(),
+               oldName, newName);
 }
 
 void Actor::writeToXML(ofstream& fout)

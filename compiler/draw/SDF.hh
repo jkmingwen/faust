@@ -38,6 +38,7 @@ public:
     string getDelayInputSigName();
     pair<string, int> getArg();
     vector<string> getInputSignalNames();
+    void replaceInputSignalName(string oldName, string newName);
     void writeToXML(ofstream& fout);
     void writePropertiesToXML(ofstream& fout);
     void printInfo(); // for debugging

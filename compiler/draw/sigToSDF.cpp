@@ -29,10 +29,12 @@ void sigToSDF(Tree L, ofstream& fout)
     int outCount = 0;
     vector<string> delayActors;
     vector<string> recActors;
+    vector<string> binopActors;
     const string graphName = gGlobal->gMasterName; // name of .dsp file
+
     while (isList(L)) {
         recLog(hd(L), alreadyDrawn, actorList, chList, chCount,
-               delayActors, recActors);
+               delayActors, recActors, binopActors);
         // add output node (and related ports/channels) to relevant lists
         string outName("OUTPUT_" + to_string(outCount));
         actorList.insert(pair<string, Actor>(outName,
@@ -75,6 +77,7 @@ void sigToSDF(Tree L, ofstream& fout)
         string channelToRemove = channelNameFromActors(i, r, chList);
         actorList.at(i).removePort(chList.at(channelToRemove).getSrcPort());
         chList.erase(chList.find(channelToRemove));
+        updateBinopArguments(r, i, binopActors, actorList, chList);
       }
       // remove recursive actor
       actorList.erase(actorList.find(r));
@@ -96,11 +99,23 @@ void sigToSDF(Tree L, ofstream& fout)
         chList.erase(chList.find(rmChannel));
         cout << "\t\tNumber of ports left for " << argActorName << ": "
              << actorList.at(argActorName).getPorts().size() << endl;
+        updateBinopArguments(d, actorList.at(d).getDelayInputSigName(),
+                             binopActors, actorList, chList);
         actorList.erase(actorList.find(d));
         // Remove argument actor if it's found to be purely for delay
         if (actorList.at(argActorName).getPorts().size() == 0) {
             actorList.erase(actorList.find(argActorName));
         }
+    }
+    // update names of binop actors to reflect order of input arguments
+    for (auto& b : binopActors) {
+      string newName = actorList.at(b).getName();
+      cout << "Updated order of args for " << b << ":" << endl;
+      for (auto& arg : actorList.at(b).getInputSignalNames()) {
+        newName += "_" + arg;
+        cout << "\t " << arg << endl;
+      }
+      actorList.at(b).setName(newName);
     }
     // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
@@ -140,7 +155,8 @@ void sigToSDF(Tree L, ofstream& fout)
  */
 static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                    map<string, Channel>& chList, int& chCount,
-                   vector<string>& delayActors, vector<string>& recActors)
+                   vector<string>& delayActors, vector<string>& recActors,
+                   vector<string>& binopActors)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -151,7 +167,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
         if (isList(sig)) {
             do {
                 recLog(hd(sig), drawn, actorList, chList, chCount,
-                       delayActors, recActors);
+                       delayActors, recActors, binopActors);
                 sig = tl(sig);
             } while (isList(sig));
         } else {
@@ -168,10 +184,22 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                 arg1_name << arg1;
                 arg2_name << arg2;
                 delayActors.push_back(actorName.str());
-                if (isSigInt(arg2, &arg2_val)) { // assign int value
+                if (isSigInt(arg2, &arg2_val)) { // assigns int value to arg2_val
                 }
                 actorList.at(actorName.str()).setDelayInputSigName(arg1_name.str());
                 actorList.at(actorName.str()).setArg(arg2_name.str(), arg2_val);
+            } else if (isSigBinOp(sig, &arg2_val, arg1, arg2)) {
+              stringstream arg1Name;
+              stringstream arg2Name;
+              arg1Name << arg1;
+              arg2Name << arg2;
+              cout << actorName.str() << " order of args:\n"
+                   << "\t1. " << arg1Name.str() << "\n"
+                   << "\t2. " << arg2Name.str() << endl;
+              // track order of arguments for binary operators
+              binopActors.push_back(actorName.str());
+              actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
+              actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
             }
 
             // draw the subsignals
@@ -226,7 +254,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
 
                 for (int i = 0; i < n; i++) {
                     recLog(subsig[i], drawn, actorList, chList, chCount,
-                           delayActors, recActors);
+                           delayActors, recActors, binopActors);
                     // log channels and corresponding ports for the connected actors
                     string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
                     stringstream srcActor;
@@ -472,4 +500,17 @@ string channelNameFromActors(string srcActor, string dstActor, map<string, Chann
         }
     }
     return "ERROR no matching channel";
+}
+
+// update argument actor names of binary operators if they have changed
+void updateBinopArguments(string oldArg, string newArg, vector<string>& binopList,
+                          map<string, Actor>& actorList, map<string, Channel>& chList) {
+  for (auto& op : binopList) {
+    vector<string> argNames = (actorList.at(op)).getInputSignalNames();
+    for (auto& arg : argNames) {
+      if (oldArg == arg) {
+        (actorList.at(op)).replaceInputSignalName(oldArg, newArg);
+      }
+    }
+  }
 }
