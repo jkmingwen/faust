@@ -379,7 +379,7 @@ static string sigLabel(Tree sig)
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
         fout << "vslider";
     } else if (isSigHSlider(sig, label, c, x, y, z)) {
-        fout << "hslider";
+      fout << "hslider" << "_" << *c;
     } else if (isSigNumEntry(sig, label, c, x, y, z)) {
         fout << "nentry";
     }
