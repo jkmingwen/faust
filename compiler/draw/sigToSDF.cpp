@@ -116,9 +116,17 @@ void sigToSDF(Tree L, ofstream& fout)
         cout << "\t " << arg << endl;
       }
       actorList.at(b).setName(newName);
+      for (auto& c : chList) { // update actor name in channel list
+        if (c.second.getSrcActor() == b) {
+          chList.at(c.first).setSrcActor(newName);
+        } else if (c.second.getDstActor() == b) {
+          chList.at(c.first).setDstActor(newName);
+        }
+      }
     }
     // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
+      cout << "Adding self loops for " << a.first << endl;
         // add self loops
         string srcPortName("in_R" + a.first);
         string dstPortName("out_R" + a.first);
@@ -131,8 +139,8 @@ void sigToSDF(Tree L, ofstream& fout)
         string chName("channel_" + a.first);
         chList.insert(pair<string, Channel>(chName,
                                             Channel(chName,
-                                                    a.first, srcPortName,
-                                                    a.first, dstPortName,
+                                                    a.second.getName(), srcPortName,
+                                                    a.second.getName(), dstPortName,
                                                     1, 1)));
         a.second.writeToXML(fout);
     }
