@@ -75,7 +75,7 @@ mv TMP$$ $CMAKE
 
 MAKERELEASE=$ROOT/build/MakeRelease.bat
 echo " updating $MAKERELEASE"
-sed "s/^SET VERSION=[0-9].*/SET (VERSION=$VERSION)/" $MAKERELEASE > TMP$$
+sed "s/^SET VERSION=[0-9].*/SET VERSION=$VERSION/" $MAKERELEASE > TMP$$
 mv TMP$$ $MAKERELEASE
 
 FAUST=$ROOT/compiler/generator/export.hh
@@ -102,6 +102,11 @@ COPYING=$ROOT/COPYING.txt
 echo " updating $COPYING"
 sed "s/FAUST compiler, Version[ 	]*[0-9].*/FAUST compiler, Version $VERSION/" $COPYING > TMP$$
 mv -f TMP$$ $COPYING
+
+DOXYFILE=$ROOT/documentation/libfaust/Doxyfile
+echo " updating $DOXYFILE"
+sed "s/PROJECT_NUMBER         = [ 	]*[0-9].*/PROJECT_NUMBER         = $VERSION/" $DOXYFILE > TMP$$
+mv -f TMP$$ $DOXYFILE
 
 make man
 

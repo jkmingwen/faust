@@ -27,11 +27,29 @@
 #include <sstream>
 #include <string>
 #include <map>
+#include <climits>
 
 #include "Text.hh"
 #include "fir_to_fir.hh"
 #include "instructions.hh"
 #include "type_manager.hh"
+
+// To check all control fields in the DSP structure
+inline bool isControl(const string& name)
+{
+    return startWith(name, "fButton")
+        || startWith(name, "fCheckbox")
+        || startWith(name, "fVslider")
+        || startWith(name, "fHslider")
+        || startWith(name, "fEntry")
+        || startWith(name, "fVbargraph")
+        || startWith(name, "fHbargraph")
+        || name == "iControl"
+        || name == "fControl"
+        || name == "iZone"
+        || name == "fZone"
+        || name == "fSampleRate";
+}
 
 class TextInstVisitor : public InstVisitor {
    protected:
@@ -49,11 +67,12 @@ class TextInstVisitor : public InstVisitor {
         }
     }
     
-    void visitCond(ValueInst* cond)
+    // To be adapted in subclasses
+    virtual void visitCond(ValueInst* cond)
     {
-        if (dynamic_cast<LoadVarInst*>(cond)) *fOut << "(";
+        *fOut << "(";
         cond->accept(this);
-        if (dynamic_cast<LoadVarInst*>(cond)) *fOut << ")";
+        *fOut << ")";
     }
   
    public:
@@ -183,16 +202,29 @@ class TextInstVisitor : public InstVisitor {
         }
         *fOut << '}';
     }
+    
+    
+    bool needParenthesis(BinopInst* inst, ValueInst* arg)
+    {
+        int p0 = gBinOpTable[inst->fOpcode]->fPriority;
+        BinopInst* a = dynamic_cast<BinopInst*>(arg);
+        int p1 = a ? gBinOpTable[a->fOpcode]->fPriority : INT_MAX;
+        return (isLogicalOpcode(inst->fOpcode) || (p0 > p1)) && !arg->isSimpleValue();
+    }
 
     virtual void visit(BinopInst* inst)
     {
-        *fOut << "(";
+        bool cond1 = needParenthesis(inst, inst->fInst1);
+        bool cond2 = needParenthesis(inst, inst->fInst2);
+        if (cond1) *fOut << "(";
         inst->fInst1->accept(this);
+        if (cond1) *fOut << ")";
         *fOut << " ";
         *fOut << gBinOpTable[inst->fOpcode]->fName;
         *fOut << " ";
+        if (cond2) *fOut << "(";
         inst->fInst2->accept(this);
-        *fOut << ")";
+        if (cond2) *fOut << ")";
     }
 
     virtual void visit(::CastInst* inst) { faustassert(false); }
@@ -224,13 +256,10 @@ class TextInstVisitor : public InstVisitor {
     virtual void generateFunDefArgs(DeclareFunInst* inst)
     {
         *fOut << "(";
-        
-        list<NamedTyped*>::const_iterator it;
-        
         size_t size = inst->fType->fArgsTypes.size(), i = 0;
-        for (it = inst->fType->fArgsTypes.begin(); it != inst->fType->fArgsTypes.end(); it++, i++) {
-            *fOut << fTypeManager->generateType((*it));
-            if (i < size - 1) *fOut << ", ";
+        for (const auto& it : inst->fType->fArgsTypes) {
+            *fOut << fTypeManager->generateType(it);
+            if (i++ < size - 1) *fOut << ", ";
         }
     }
 
@@ -273,7 +302,7 @@ class TextInstVisitor : public InstVisitor {
     virtual void visit(Select2Inst* inst)
     {
         *fOut << "(";
-        inst->fCond->accept(this);
+        visitCond(inst->fCond);
         *fOut << " ? ";
         inst->fThen->accept(this);
         *fOut << " : ";
@@ -283,9 +312,9 @@ class TextInstVisitor : public InstVisitor {
 
     virtual void visit(IfInst* inst)
     {
-        *fOut << "if ";
+        *fOut << "if (";
         visitCond(inst->fCond);
-        *fOut << " {";
+        *fOut << ") {";
         fTab++;
         tab(fTab, *fOut);
         inst->fThen->accept(this);
@@ -350,7 +379,7 @@ class TextInstVisitor : public InstVisitor {
             tab(fTab, *fOut);
         }
         RetInst* ret_inst = nullptr;
-        for (auto& it : inst->fCode) {
+        for (const auto& it : inst->fCode) {
             // Special case for "return" as last instruction
             if ((it == *inst->fCode.rbegin()) && (ret_inst = dynamic_cast<RetInst*>(it))) {
                 visitAux(ret_inst, false);
@@ -369,7 +398,7 @@ class TextInstVisitor : public InstVisitor {
     virtual void visit(::SwitchInst* inst)
     {
         *fOut << "switch (";
-        visitCond(inst->fCond);
+        inst->fCond->accept(this);
         *fOut << ") {";
         fTab++;
         tab(fTab, *fOut);

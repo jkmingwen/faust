@@ -11,7 +11,7 @@
 #. faustoptflags
 . usage.sh
 
-CXXFLAGS="-O3 -ffast-math -ftree-vectorize -DIOS"
+CXXFLAGS+=" $MYGCCFLAGS -DIOS"  # So that additional CXXFLAGS can be used
 
 ARCHFILE="ca-qt.cpp"
 ARCHLIB="-framework AudioToolbox -framework CoreMIDI -framework CoreFoundation "
@@ -69,7 +69,7 @@ for p in $@; do
 		QRDEFS="DEFINES += QRCODECTRL"
     elif [ ${p:0:1} = "-" ]; then
 	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
+	elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 	    FILES="$FILES $p"
 	else
 	    OPTIONS="$OPTIONS $p"        

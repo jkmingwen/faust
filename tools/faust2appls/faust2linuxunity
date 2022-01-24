@@ -18,7 +18,7 @@
 . faustoptflags
 . usage.sh
 
-CXXFLAGS=$MYGCCFLAGS
+CXXFLAGS+=" $MYGCCFLAGS"  # So that additional CXXFLAGS can be used
 
 NVOICES=-1
 
@@ -33,24 +33,24 @@ do
         usage faust2linuxunity "[options] [Faust options] <file.dsp>"
         platform Linux
         require Jack, Unity
-        echo "Compiles Faust programs to Linux x86_64 library suitable for the Unity environment"
+        echo "Compiles Faust programs to Linux x86_64 libraries suitable for the Unity environment"
         option
         option "-nvoices <num>"
         option "Faust options"
         exit
     fi
 
-	if [ $p = "-nvoices" ]; then
+    if [ $p = "-nvoices" ]; then
         shift
         NVOICES=$1
     elif [ ${p:0:1} = "-" ]; then
-	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
-	    FILES="$FILES $p"
-	else
-	    OPTIONS="$OPTIONS $p"        
-	fi
-	
+        OPTIONS="$OPTIONS $p"
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
+        FILES="$FILES $p"
+    else
+        OPTIONS="$OPTIONS $p"        
+    fi
+    
 shift
 done
 
@@ -92,17 +92,17 @@ for p in $FILES; do
     fi
 
     # compile faust to c++
-    faust -i -a $FAUSTARCH/unity/unityplugin.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/$NAME.cpp" || (echo "$f : Faust to C++ compilation failed in faust2linuxunity"; exit 1)
+    faust -uim -i -a $FAUSTARCH/unity/unityplugin.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/$NAME.cpp" || (echo "$f : Faust to C++ compilation failed in faust2linuxunity"; exit 1)
 
     # compile c++ to binary
     (
         cd "$TMP"
         if [ $NVOICES == -1 ]; then
-        	$CXX $CXXFLAGS $LIB -Dmydsp=$NAME -o $LIBNAME $NAME.cpp
-		else
-			$CXX $CXXFLAGS $LIB -Dmydsp=$NAME -DPOLY -o $LIBNAME $NAME.cpp
-		fi
-	) > /dev/null || (echo "$f : C++ to linux library compilation failed in faust2linuxunity"; exit 1)
+            $CXX $CXXFLAGS $LIB -Dmydsp=$NAME -o $LIBNAME $NAME.cpp
+        else
+            $CXX $CXXFLAGS $LIB -Dmydsp=$NAME -DPOLY -o $LIBNAME $NAME.cpp
+        fi
+    ) > /dev/null || (echo "$f : C++ to linux library compilation failed in faust2linuxunity"; exit 1)
 
     # moves binary to final dir
     rm -rf "$SRCDIR/$LIBNAME"

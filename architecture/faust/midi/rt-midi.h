@@ -32,10 +32,9 @@
 
 class MapUI;
 
-//-------------------------------------------------
-// MIDI input/output handling using RtMidi library
-//-------------------------------------------------
-
+/**
+ *  MIDI input/output handling using RtMidi library: http://www.music.mcgill.ca/~gary/rtmidi/
+ */
 class rt_midi : public midi_handler {
 
     private:
@@ -130,7 +129,7 @@ class rt_midi : public midi_handler {
         
         void sendMessage(std::vector<unsigned char>& message)
         {
-            for (auto& it : fOutput) {
+            for (const auto& it : fOutput) {
                 it->sendMessage(&message);
             }
         }
@@ -175,11 +174,11 @@ class rt_midi : public midi_handler {
         
         void stopMidi()
         {
-            for (auto& it1 : fInput) {
+            for (const auto& it1 : fInput) {
                 delete it1;
             }
             fInput.clear();
-            for (auto& it2 : fOutput) {
+            for (const auto& it2 : fOutput) {
                 delete it2;
             }
             fOutput.clear();
@@ -190,7 +189,7 @@ class rt_midi : public midi_handler {
         {
             int count = 0;
             double first_time_stamp = 0.;
-            for (auto& it : fInput) {
+            for (const auto& it : fInput) {
                 std::vector<unsigned char> message;
                 double time_stamp = (uint32_t)it->getMessage(&message);
                 // Small messages
@@ -226,7 +225,7 @@ class rt_midi : public midi_handler {
             message.push_back(pitch);
             message.push_back(velocity);
             sendMessage(message);
-            return 0;
+            return nullptr;
         }
         
         void keyOff(int channel, int pitch, int velocity) 

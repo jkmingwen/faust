@@ -17,7 +17,7 @@
 . faustpath
 . faustoptflags
 
-CXXFLAGS=$MYGCCFLAGS
+CXXFLAGS+=" $MYGCCFLAGS"  # So that additional CXXFLAGS can be used
 
 NVOICES=-1
 
@@ -30,7 +30,7 @@ do
     
     if [ $p = "-help" ] || [ $p = "-h" ]; then
         echo "faust2unitywin -32 -64 [additional Faust options (-vec -vs 8...)] <file1.dsp> [<file2.dsp>]"
-        echo "Create Microsoft 32/64bits library for faust unity plugin."
+        echo "Create Microsoft 32/64bits library for Faust Unity plugins"
         echo "Mingw crosscompiler should be installed ('mingw32' package on Ubuntu)"
         echo "Use 'faust2unity -w32 -w64' to also create the C# and JSON files"
         echo "Use '-nvoices <num>' to produce a polyphonic self-contained DSP with <num> voices, ready to be used with MIDI"
@@ -47,7 +47,7 @@ do
         NVOICES=$1
     elif [ ${p:0:1} = "-" ]; then
         OPTIONS="$OPTIONS $p"
-    elif [[ -f "$p" ]]; then
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
         FILES="$FILES $p"
     else
         OPTIONS="$OPTIONS $p"
@@ -88,7 +88,7 @@ for p in $FILES; do
     mkdir "$TMP"
 
     # compile faust to c++
-    faust -i -a $FAUSTARCH/unity/unityplugin.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/$NAME.cpp" || (echo "$f : Faust to C++ compilation failed in faust2unitywin"; exit 1)
+    faust -uim -i -a $FAUSTARCH/unity/unityplugin.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/$NAME.cpp" || (echo "$f : Faust to C++ compilation failed in faust2unitywin"; exit 1)
 
     for BIT in $BITS; do
         #-----------------------------------------------------------------------

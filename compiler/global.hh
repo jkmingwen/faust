@@ -56,13 +56,14 @@ class Garbageable;
 struct DispatchVisitor;
 class WASTInstVisitor;
 class WASMInstVisitor;
+class JuliaInstVisitor;
 struct TableSizeVisitor;
 struct DeclareStructTypeInst;
 
 struct Typed;
 struct BasicTyped;
 
-class dsp_factory_base;
+struct dsp_factory_base;
 
 typedef long double quad;
 
@@ -134,6 +135,7 @@ struct global {
     bool gUIMacroSwitch;
     bool gDumpNorm;
     int  gFTZMode;
+    bool gRangeUI;  // whether to generate code to limit vslider/hslider/nentry values in [min..max] range
 
     int gFloatSize;
 
@@ -141,10 +143,12 @@ struct global {
     bool gInlineArchSwitch;
 
     bool gDSPStruct;
-    bool gLightMode;    // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
-                        // for JavaScript)
-    bool gClang;        // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
-    string gCheckTable; // whether to check RDTable and RWTable index range
+    bool gLightMode;  // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
+                      // for JavaScript)
+    bool   gClang;    // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
+    string gCheckTable;  // whether to check RDTable and RWTable index range
+    
+    bool   gMathExceptions;  // whether to check math functions domains
 
     string gClassName;       // name of the generated dsp class, by default 'mydsp'
     string gSuperClassName;  // name of the root class the generated dsp class inherits from, by default 'dsp'
@@ -164,12 +168,17 @@ struct global {
     bool   gUseDefaultSound;       // If default global variable is used in 'soundfile' primitive generation
     bool   gHasTeeLocal;           // For wast/wasm backends
     bool   gFastMath;              // Faster version of some mathematical functions (pow/exp/log)
+    bool   gMathApprox;            // Simpler/faster versions of 'floor/fmod/remainder' functions
     bool   gNeedManualPow;         // If manual pow(x, y) generation when y is an integer is needed
     bool   gRemoveVarAddress;      // If used of variable addresses (like &foo or &foo[n]) have to be removed
-    bool   gOneSample;             // Generate one sample computation
+    int    gOneSample;             // Generate one sample computation: (0 = separated control) (1 = separated control and DSP struct)
     bool   gOneSampleControl;      // Generate one sample computation control structure in DSP module
+    bool   gComputeMix;            // Mix in outputs buffers
     string gFastMathLib;           // The fastmath code mapping file
     string gNameSpace;             // Wrapping namespace used with the C++ backend
+
+    int gWideningLimit;     // Max number of iterations before interval widening
+    int gNarrowingLimit;    // Max number of iterations to compute interval widener
 
     map<string, string> gFastMathLibTable;      // Mapping table for fastmath functions
     map<string, bool>   gMathForeignFunctions;  // Map of math foreign functions
@@ -349,9 +358,10 @@ struct global {
     property<Tree>* gSymListProp;
 
     Sym SIGINPUT;
+    int gMaxInputs;  // Max input allocated with sigInput API
     Sym SIGOUTPUT;
     Sym SIGDELAY1;
-    Sym SIGFIXDELAY;
+    Sym SIGDELAY;
     Sym SIGPREFIX;
     Sym SIGIOTA;
     Sym SIGRDTBL;
@@ -362,7 +372,9 @@ struct global {
     Sym SIGDOCWRITETBL;
     Sym SIGDOCACCESSTBL;
     Sym SIGSELECT2;
-    Sym SIGSELECT3;
+    Sym SIGASSERTBOUNDS;
+    Sym SIGHIGHEST;
+    Sym SIGLOWEST;
     Sym SIGBINOP;
     Sym SIGFFUN;
     Sym SIGFCONST;
@@ -418,6 +430,9 @@ struct global {
 
     // Trying to accelerate type convergence
     Type TREC;  // kVect ou kScal ?
+    Type TRECMAX;
+
+    res RES;
 
     Sym  CONS;
     Sym  NIL;
@@ -442,6 +457,8 @@ struct global {
     int gMachineInt32Size;
     int gMachineInt64Size;
     int gMachineDoubleSize;
+    int gMachineQuadSize;
+    int gMachineFixedPointSize;
     int gMachineBoolSize;
     int gMachinePtrSize;
 
@@ -481,8 +498,8 @@ struct global {
     char* gCurrentLocal;
 
     int gAllocationCount;  // Internal signal types counter
-    
-    int gMaskDelayLineThreshold;   // Power-of-two and mask delay-lines treshold
+
+    int gMaskDelayLineThreshold;  // Power-of-two and mask delay-lines treshold
 
     bool gEnableFlag;
 
@@ -495,6 +512,11 @@ struct global {
 #ifdef INTERP_BUILD
     // One single global visitor Interpreter backend, so that sub-containers and the global container use the same heap
     DispatchVisitor* gInterpreterVisitor;
+#endif
+    
+#ifdef JULIA_BUILD
+    // One single global visitor Julia backend, so that sub-containers and the global container use the same heap
+    JuliaInstVisitor* gJuliaVisitor;
 #endif
 
 #ifdef SOUL_BUILD
@@ -512,10 +534,12 @@ struct global {
     bool   gGraphSwitch;
     bool   gDrawPSSwitch;
     bool   gDrawSVGSwitch;
+    bool   gVHDLSwitch;
+    bool   gVHDLTrace;
+    bool   gElementarySwitch;
     bool   gPrintXMLSwitch;
     bool   gPrintJSONSwitch;
     bool   gPrintDocSwitch;
-    int    gBalancedSwitch;
     string gArchFile;
     bool   gExportDSP;
     bool   gPrintSDFSwitch;
@@ -544,6 +568,8 @@ struct global {
 
     static void allocate();
     static void destroy();
+    
+    static string printFloat();
 
     string getFreshID(const string& prefix);
 
@@ -561,14 +587,18 @@ struct global {
 
     bool hasVarType(const string& name) { return gVarTypeTable.find(name) != gVarTypeTable.end(); }
 
-    Typed::VarType getVarType(const string& name) { return gVarTypeTable[name]->getType(); }
+    BasicTyped* genBasicTyped(Typed::VarType type);
 
-    bool isMathForeignFunction(const string& name)
-    {
-        return (gMathForeignFunctions.find(name) != gMathForeignFunctions.end());
-    }
+    Typed::VarType getVarType(const string& name);
 
-    void printCompilationOptions(ostream& dst, bool backend = true);
+    void setVarType(const string& name, Typed::VarType type);
+
+    inline bool startWith(const string& str, const string& prefix) { return (str.substr(0, prefix.size()) == prefix); }
+
+    // Some backends have an internal implementation of foreign functions like acos, asinh...
+    bool hasForeignFunction(const string& name, const string& inc_file);
+   
+    void printCompilationOptions(stringstream& dst, bool backend = true);
 
     void initTypeSizeMap();
 

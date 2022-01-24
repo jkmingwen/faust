@@ -39,8 +39,6 @@ class CeilPrim : public xtended {
         return floatCast(args[0]);
     }
 
-    virtual void sigVisit(Tree sig, sigvisitor* visitor) {}
-
     virtual int infereSigOrder(const vector<int>& args)
     {
         faustassert(args.size() == arity());
@@ -54,7 +52,13 @@ class CeilPrim : public xtended {
         if (isNum(args[0], n)) {
             return tree(ceil(double(n)));
         } else {
-            return tree(symbol(), args[0]);
+            if (gGlobal->gMathApprox) {
+                // res = T(int(n)); return (r == n) ? n : (n >= 0 ? r + 1 : r);
+                Tree r = sigFloatCast(sigIntCast(args[0]));
+                return sigSelect2(sigBinOp(kEQ, args[0], r), sigSelect2(sigBinOp(kGE, args[0], sigInt(0)), r, sigBinOp(kAdd, r, sigInt(1))), args[0]);
+            } else {
+                return tree(symbol(), args[0]);
+            }
         }
     }
 
@@ -72,7 +76,7 @@ class CeilPrim : public xtended {
         return container->pushFunction(subst("ceil$0", isuffix()), result_type, arg_types, casted_args);
     }
 
-    virtual string old_generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
+    virtual string generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());

@@ -1,7 +1,8 @@
-version := 2.24.4
+version := 2.39.1
 
 system	?= $(shell uname -s)
 
+-include user.mk
 DESTDIR ?=
 PREFIX ?= /usr/local
 INSTALL_LIBDIR ?= lib
@@ -37,6 +38,10 @@ developer : updatesubmodules
 
 all : updatesubmodules
 	$(MAKE) -C $(BUILDLOCATION) cmake BACKENDS=all.cmake TARGETS=all.cmake
+	$(MAKE) -C $(BUILDLOCATION)
+
+libsall : updatesubmodules
+	$(MAKE) -C $(BUILDLOCATION) cmake BACKENDS=regular.cmake TARGETS=all.cmake
 	$(MAKE) -C $(BUILDLOCATION)
 
 travis : updatesubmodules
@@ -115,6 +120,7 @@ help :
 	@echo " 'most'          : builds the Faust compiler with LLVM backend and every static libraries"
 	@echo " 'developer'     : builds the Faust compiler with every possible backends and every static libraries"
 	@echo " 'all'           : builds the Faust compiler with every possible backends and every static and dynamic libraries"
+	@echo " 'libsall'       : builds the Faust compiler (without the LLVM backend) and includes all the static and dynamic libraries"
 	@echo
 	@echo " 'install'       : install the compiler, tools and the architecture files in $(prefix)/bin $(prefix)/share/faust $(prefix)/include/faust"
 	@echo " 'clean'         : remove all object files"

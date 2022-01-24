@@ -33,8 +33,11 @@
 #include "garbageable.hh"
 #include "global.hh"
 #include "instructions.hh"
-#include "occurences.hh"
+#include "dcond.hh"
+#include "old_occurences.hh"
 #include "property.hh"
+
+#define _DNF_ 1
 
 using namespace std;
 
@@ -49,11 +52,17 @@ class InstructionsCompiler : public virtual Garbageable {
     property<pair<string, string>>  fStaticInitProperty;
     property<pair<string, string>>  fInstanceInitProperty;
     property<string>                fTableProperty;
+    
+    map<Tree, Tree> fConditionProperty;  // used with the new X,Y:enable --> sigControl(X*Y,Y>0) primitive
+    
     Tree                            fSharingKey;
-    OccMarkup                       fOccMarkup;
+    old_OccMarkup*                  fOccMarkup;
 
     // Ensure IOTA base fixed delays are computed once
-    std::map<int, std::string> fIOTATable;
+    map<int, string> fIOTATable;
+    
+    // Several 'IOTA' variables may be needed when subcontainers are inlined in the main module
+    string fCurrentIOTA;
 
     Tree         fUIRoot;
     Description* fDescription;
@@ -63,9 +72,7 @@ class InstructionsCompiler : public virtual Garbageable {
      'mask' delay-lines use the next power-of-two value size and a mask (faster but use more memory)
      'select' delay-line use N+1 and use select to wrap the read/write indexes (use less memory but slower)
     */
-    
-    bool fHasIota;
-
+  
     void getTypedNames(::Type t, const string& prefix, Typed::VarType& ctype, string& vname);
 
     bool     getCompiledExpression(Tree sig, InstType& cexp);
@@ -139,6 +146,21 @@ class InstructionsCompiler : public virtual Garbageable {
     void sharingAnnotation(int vctxt, Tree sig);
 
     FIRIndex getCurrentLoopIndex() { return FIRIndex(fContainer->getCurLoop()->getLoopIndex()); }
+    
+    void declareWaveform(Tree sig, string& vname, int& size);
+    
+    // Enable/control
+    void conditionAnnotation(Tree l);
+    void conditionAnnotation(Tree t, Tree nc);
+    void conditionStatistics(Tree l);
+    
+    ValueInst* cnf2code(Tree cc);
+    ValueInst* or2code(Tree oc);
+    
+    ValueInst* dnf2code(Tree cc);
+    ValueInst* and2code(Tree oc);
+    
+    ValueInst* getConditionCode(Tree sig);
 
    public:
     InstructionsCompiler(CodeContainer* container);
@@ -158,7 +180,7 @@ class InstructionsCompiler : public virtual Garbageable {
     virtual ValueInst* generateCode(Tree sig);
 
     virtual ValueInst* generateXtended(Tree sig);
-    virtual ValueInst* generateFixDelay(Tree sig, Tree arg, Tree size);
+    virtual ValueInst* generateDelay(Tree sig, Tree arg, Tree size);
     virtual ValueInst* generatePrefix(Tree sig, Tree x, Tree e);
     virtual ValueInst* generateIota(Tree sig, Tree arg);
     virtual ValueInst* generateBinOp(Tree sig, int opcode, Tree arg1, Tree arg2);
@@ -176,7 +198,6 @@ class InstructionsCompiler : public virtual Garbageable {
     virtual ValueInst* generateStaticSigGen(Tree sig, Tree content);
 
     virtual ValueInst* generateSelect2(Tree sig, Tree sel, Tree s1, Tree s2);
-    virtual ValueInst* generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3);
 
     virtual ValueInst* generateRecProj(Tree sig, Tree exp, int i);
     virtual ValueInst* generateRec(Tree sig, Tree var, Tree le, int index = -1);
@@ -205,7 +226,9 @@ class InstructionsCompiler : public virtual Garbageable {
 
     virtual ValueInst* generateDelayVec(Tree sig, ValueInst* exp, Typed::VarType ctype, const string& vname, int mxd);
     virtual ValueInst* generateDelayLine(ValueInst* exp, Typed::VarType ctype, const string& vname, int mxd,
-                                         Address::AccessType& var_access);
+                                         Address::AccessType& var_access, ValueInst* ccs);
+    
+    virtual ValueInst* generateControl(Tree sig, Tree x, Tree y);
 
     // UI hierachy description
     void addUIWidget(Tree path, Tree widget);
@@ -220,11 +243,10 @@ class InstructionsCompiler : public virtual Garbageable {
 
     void         setDescription(Description* descr) { fDescription = descr; }
     Description* getDescription() { return fDescription; }
-
+    
     Tree prepare(Tree LS);
     Tree prepare2(Tree L0);
-
-    void declareWaveform(Tree sig, string& vname, int& size);
+  
 };
 
 #endif

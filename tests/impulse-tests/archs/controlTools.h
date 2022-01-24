@@ -9,6 +9,7 @@
 #include "faust/gui/SoundUI.h"
 
 #include "faust/dsp/llvm-dsp.h"
+#include "faust/dsp/libfaust.h"
 #include "faust/dsp/one-sample-dsp.h"
 #include "faust/gui/GUI.h"
 #include "faust/dsp/poly-dsp.h"
@@ -53,9 +54,17 @@ struct TestMemoryReader : public MemoryReader {
         soundfile->fOffset[part] = offset;
         
         // Audio frames have to be written for each chan
-        for (int sample = 0; sample < SOUND_LENGTH; sample++) {
-            for (int chan = 0; chan < SOUND_CHAN; chan++) {
-                soundfile->fBuffers[chan][offset + sample] = std::sin(part + (2 * M_PI * float(sample)/SOUND_LENGTH));
+       if (soundfile->fIsDouble) {
+            for (int sample = 0; sample < SOUND_LENGTH; sample++) {
+                for (int chan = 0; chan < SOUND_CHAN; chan++) {
+                    static_cast<double**>(soundfile->fBuffers)[chan][offset + sample] = std::sin(part + (2 * M_PI * double(sample)/SOUND_LENGTH));
+                }
+            }
+        } else {
+            for (int sample = 0; sample < SOUND_LENGTH; sample++) {
+                for (int chan = 0; chan < SOUND_CHAN; chan++) {
+                    static_cast<float**>(soundfile->fBuffers)[chan][offset + sample] = std::sin(part + (2 * M_PI * float(sample)/SOUND_LENGTH));
+                }
             }
         }
 
@@ -101,7 +110,7 @@ struct CheckControlUI : public GenericUI {
    
     bool checkDefaults()
     {
-        for (auto& it : fControlZone) {
+        for (const auto& it : fControlZone) {
             if (*it.first != it.second) return false;
         }
         return true;
@@ -109,7 +118,7 @@ struct CheckControlUI : public GenericUI {
     
     void initRandom()
     {
-        for (auto& it : fControlZone) {
+        for (const auto& it : fControlZone) {
             *it.first = 0.123456789;
         }
     }
@@ -123,9 +132,7 @@ struct malloc_memory_manager : public dsp_memory_manager {
     
     virtual void* allocate(size_t size)
     {
-        void* res = malloc(size);
-        memset(res, 0, size);
-        return res;
+        return calloc(1, size);
     }
  
     virtual void destroy(void* ptr)
@@ -162,10 +169,8 @@ static void runPolyDSP(dsp* dsp, int& linenum, int nbsamples, int num_voices = 4
     
     // Soundfile
     TestMemoryReader memory_reader;
-    SoundUI sound_ui("", -1, &memory_reader);
-    DSP->setGroup(false);
+    SoundUI sound_ui("", -1, &memory_reader, (sizeof(FAUSTFLOAT) == sizeof(double)));
     DSP->buildUserInterface(&sound_ui);
-    DSP->setGroup(true);
   
     // Get control and then 'initRandom'
     CheckControlUI controlui;
@@ -253,7 +258,7 @@ static void runDSP(dsp* DSP, const string& file, int& linenum, int nbsamples, bo
     
     // Soundfile
     TestMemoryReader memory_reader;
-    SoundUI sound_ui("", -1, &memory_reader);
+    SoundUI sound_ui("", -1, &memory_reader, (sizeof(FAUSTFLOAT) == sizeof(double)));
     DSP->buildUserInterface(&sound_ui);
     
     // Get control and then 'initRandom'
@@ -327,7 +332,7 @@ static void runDSP(dsp* DSP, const string& file, int& linenum, int nbsamples, bo
     GUI::updateAllGuis();
     
     // print audio frames
-    int i;
+    int i = 0;
     try {
         while (nbsamples > 0) {
             if (run == 0) {
@@ -352,7 +357,7 @@ static void runDSP(dsp* DSP, const string& file, int& linenum, int nbsamples, bo
            
             run++;
             // Print samples
-            for (int i = 0; i < nFrames; i++) {
+            for (i = 0; i < nFrames; i++) {
                 printf("%6d : ", linenum++);
                 for (int c = 0; c < nouts; c++) {
                     FAUSTFLOAT f = normalize(ochan->buffers()[c][i]);
@@ -363,7 +368,7 @@ static void runDSP(dsp* DSP, const string& file, int& linenum, int nbsamples, bo
             nbsamples -= nFrames;
         }
     } catch (...) {
-        cerr << "ERROR in " << file << " line : " << i << std::endl;
+        cerr << "ERROR in '" << file << "' at line : " << i << std::endl;
     }
     
     delete ichan;

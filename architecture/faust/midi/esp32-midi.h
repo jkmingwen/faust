@@ -25,7 +25,6 @@
 #ifndef __esp32_midi__
 #define __esp32_midi__
 
-#include <iostream>
 #include <cstdlib>
 
 #include "driver/uart.h"
@@ -51,6 +50,9 @@ using namespace jdksmidi;
 #define PORT_NUM UART_NUM_1
 #define RX_BUF_SIZE 1024
 
+/**
+ * MIDI handler for the ESP32 boards.
+ */
 class esp32_midi : public midi_handler {
     
     private:

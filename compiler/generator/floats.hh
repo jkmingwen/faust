@@ -27,14 +27,22 @@
 
 #include "instructions.hh"
 
+#define FLOATMACRO "FAUSTFLOAT"
+#define FLOATMACROPTR "FAUSTFLOAT*"
+#define FLOATMACROPTRPTR "FAUSTFLOAT**"
+#define FLOATCASTER "(" FLOATMACRO ")"
+
 const char* isuffix();
 const char* inumix();
 double      inummin();
 
 int            ifloatsize();
 const char*    ifloat();
+const char*    ifloatptr();
+const char*    ifloatptrptr();
 Typed::VarType itfloat();
 Typed::VarType itfloatptr();
+Typed::VarType itfloatptrptr();
 const char*    icast();
 
 const char* xfloat();
@@ -42,7 +50,7 @@ const char* xcast();
 
 void initFaustFloat();
 
-void printfloatdef(std::ostream& fout, bool quad);
+void printfloatdef(std::ostream& fout);
 
 typedef long double quad;
 

@@ -260,7 +260,7 @@ struct dsp_factory_table : public std::map<T, std::list<dsp*> > {
             std::list<dsp*> dsp_list = (*it).second;
             if (factory->refs() == 2) {  // Function argument + the one in table...
                 // Possibly delete remaining DSP
-                for (auto& it1 : dsp_list) {
+                for (const auto& it1 : dsp_list) {
                     delete it1;
                 }
                 // Last use, remove from the global table, pointer will be deleted
@@ -293,6 +293,12 @@ struct dsp_factory_table : public std::map<T, std::list<dsp*> > {
 
 // Compute SHA1 key from name_app, dsp_content and compialtions arguments, and returns the dsp_content
 std::string sha1FromDSP(const std::string& name_app, const std::string& dsp_content, int argc, const char* argv[], std::string& sha_key);
+
+class CTree;
+typedef CTree* Tree;
+typedef std::vector<Tree> tvec;
+
+tvec boxesToSignalsAux(Tree box);
 
 #ifdef __cplusplus
 extern "C" {

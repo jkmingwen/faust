@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN jack-console.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -116,7 +115,6 @@ int main(int argc, char* argv[])
     bool midi_sync = false;
     int nvoices = 0;
     bool control = true;
-    mydsp_poly* dsp_poly = NULL;
     
     mydsp* tmp_dsp = new mydsp();
     MidiMeta::analyse(tmp_dsp, midi_sync, nvoices);
@@ -134,16 +132,16 @@ int main(int argc, char* argv[])
     int group = lopt(argv, "--group", 1);
     
     cout << "Started with " << nvoices << " voices\n";
-    dsp_poly = new mydsp_poly(new mydsp(), nvoices, control, group);
+    DSP = new mydsp_poly(new mydsp(), nvoices, control, group);
     
 #if MIDICTRL
     if (midi_sync) {
-        DSP = new timed_dsp(new dsp_sequencer(dsp_poly, new effect()));
+        DSP = new timed_dsp(new dsp_sequencer(DSP, new effect()));
     } else {
-        DSP = new dsp_sequencer(dsp_poly, new effect());
+        DSP = new dsp_sequencer(DSP, new effect());
     }
 #else
-    DSP = new dsp_sequencer(dsp_poly, new effect());
+    DSP = new dsp_sequencer(DSP, new effect());
 #endif
     
 #else
@@ -153,16 +151,12 @@ int main(int argc, char* argv[])
     
     if (nvoices > 0) {
         cout << "Started with " << nvoices << " voices\n";
-        dsp_poly = new mydsp_poly(new mydsp(), nvoices, control, group);
+        DSP = new mydsp_poly(new mydsp(), nvoices, control, group);
         
 #if MIDICTRL
         if (midi_sync) {
-            DSP = new timed_dsp(dsp_poly);
-        } else {
-            DSP = dsp_poly;
+            DSP = new timed_dsp(DSP);
         }
-#else
-        DSP = dsp_poly;
 #endif
     } else {
 #if MIDICTRL
@@ -184,10 +178,7 @@ int main(int argc, char* argv[])
 
 #ifdef SOUNDFILE
     SoundUI soundinterface;
-    // SoundUI has to be dispatched on all internal voices
-    if (dsp_poly) dsp_poly->setGroup(false);
     DSP->buildUserInterface(&soundinterface);
-    if (dsp_poly) dsp_poly->setGroup(group);
 #endif
     DSP->buildUserInterface(&interface);
     DSP->buildUserInterface(&finterface);
@@ -222,12 +213,10 @@ int main(int argc, char* argv[])
     MidiUI* midiinterface;
     if (rtmidi) {
         rt_midi midi_handler(name);
-        midi_handler.addMidiIn(dsp_poly);
         midiinterface = new MidiUI(&midi_handler);
         printf("RtMidi is used\n");
     } else {
         midiinterface = new MidiUI(&audio);
-        audio.addMidiIn(dsp_poly);
         printf("JACK MIDI is used\n");
     }
     
@@ -238,7 +227,7 @@ int main(int argc, char* argv[])
     // First restore the state
     finterface.recallState(rcfilename);
     
-    // The process commands and possibly update it
+    // The process commands possibly updates it
     interface.process_command();
     
     if (!audio.start()) {
@@ -272,4 +261,4 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
+/******************* END jack-console.cpp ****************/

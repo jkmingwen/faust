@@ -52,7 +52,7 @@ static bool endWith(const string& str, const string& suffix)
 int main(int argc, char* argv[])
 {
     if (isopt(argv, "-h") || isopt(argv, "-help")) {
-        cout << "soul-faust-player foo.dsp (pure Faust code), foo.soulpatch (pure SOUL patch) or foo.soul (pure SOUL code or Faust/SOUL hybrid code)" << endl;
+        cout << "soul-faust-player <foo.dsp> (pure Faust code), <foo.soulpatch> (pure SOUL patch) or <foo.soul> (pure SOUL code or Faust/SOUL hybrid code)" << endl;
         exit(-1);
     }
     
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
         }
         
         // Generate "soulpatch" file
-        parser.createSOULPatch(FAUST_PATCH_FILE, FAUST_FILE);
+        parser.createSOULPatch(FAUST_FILE);
         real_file = FAUST_PATCH_FILE;
         
     } else if (endWith(filename, ".soul")) {
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
         }
         
         // Generate "soulpatch" file
-        parser.createSOULPatch(HYBRID_PATCH_FILE, HYBRID_FILE);
+        parser.createSOULPatch(HYBRID_FILE);
         real_file = HYBRID_PATCH_FILE;
         
     } else if (endWith(filename, ".soulpatch")) {
@@ -127,8 +127,7 @@ int main(int argc, char* argv[])
         midi_handler.startMidi();
         audio.start();
         
-        // Call run all GUI instances
-        GUI::runAllGuis();
+        interface.run();
         
         midi_handler.stopMidi();
         audio.stop();

@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     bool is_httpd = isopt(argv, "-httpd");
     
     if (isopt(argv, "-h") || isopt(argv, "-help")) {
-        cout << "dynamic-machine-jack-gtk [-nvoices N] [-midi] [-osc] [-httpd] foo.fbc" << endl;
+        cout << "dynamic-machine-jack-gtk [-nvoices <num>] [-midi] [-osc] [-httpd] foo.fbc" << endl;
         cout << "Use '-nvoices <num>' to produce a polyphonic self-contained DSP with <num> voices, ready to be used with MIDI or OSC\n";
         cout << "Use '-midi' to activate MIDI control\n";
         cout << "Use '-osc' to activate OSC control\n";
@@ -71,14 +71,13 @@ int main(int argc, char* argv[])
     
     dsp_factory* factory = nullptr;
     dsp* DSP = nullptr;
-    mydsp_poly* dsp_poly = nullptr;
     MidiUI* midiinterface = nullptr;
     httpdUI* httpdinterface = nullptr;
     GUI* oscinterface = nullptr;
     jackaudio_midi audio;
     string error_msg;
     
-    cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     factory = readInterpreterDSPFactoryFromBitcodeFile(argv[argc-1], error_msg);
     if (!factory) {
@@ -101,7 +100,7 @@ int main(int argc, char* argv[])
     
     if (nvoices > 0) {
         cout << "Starting polyphonic mode nvoices : " << nvoices << endl;
-        DSP = dsp_poly = new mydsp_poly(DSP, nvoices, true, true);
+        DSP = new mydsp_poly(DSP, nvoices, true, true);
     }
     
     if (isopt(argv, "-double")) {
@@ -131,10 +130,6 @@ int main(int argc, char* argv[])
     if (is_midi) {
         midiinterface = new MidiUI(&audio);
         DSP->buildUserInterface(midiinterface);
-    }
-    
-    if (nvoices > 0) {
-        audio.addMidiIn(dsp_poly);
     }
     
     // State (after UI construction)

@@ -40,6 +40,11 @@
 #include "faust/gui/MapUI.h"
 #include "faust/audio/esp32-dsp.h"
 
+#ifdef SOUNDFILE
+#define ESP32
+#include "faust/gui/SoundUI.h"
+#endif
+
 // MIDI support
 #ifdef MIDICTRL
 #include "faust/gui/MidiUI.h"
@@ -75,8 +80,10 @@
 
 /*******************BEGIN ARCHITECTURE SECTION (part 2/2)***************/
 
+using namespace std;
+
 #ifdef MIDICTRL
-std::list<GUI*> GUI::fGuiList;
+list<GUI*> GUI::fGuiList;
 ztimedmap GUI::gTimedZoneMap;
 #endif
 
@@ -84,8 +91,7 @@ AudioFaust::AudioFaust(int sample_rate, int buffer_size)
 {
 #ifdef NVOICES
     int nvoices = NVOICES;
-    mydsp_poly* dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, true);
-    fDSP = dsp_poly;
+    fDSP = new mydsp_poly(new mydsp(), nvoices, true, true);
 #else
     fDSP = new mydsp();
 #endif
@@ -96,11 +102,13 @@ AudioFaust::AudioFaust(int sample_rate, int buffer_size)
     fAudio = new esp32audio(sample_rate, buffer_size);
     fAudio->init("esp32", fDSP);
     
+#ifdef SOUNDFILE
+    fSoundUI = new SoundUI("/sdcard/", sample_rate);
+    fDSP->buildUserInterface(fSoundUI);
+#endif
+    
 #ifdef MIDICTRL
     fMIDIHandler = new esp32_midi();
-#ifdef NVOICES
-    fMIDIHandler->addMidiIn(dsp_poly);
-#endif
     fMIDIInterface = new MidiUI(fMIDIHandler);
     fDSP->buildUserInterface(fMIDIInterface);
 #endif
@@ -114,6 +122,9 @@ AudioFaust::~AudioFaust()
 #ifdef MIDICTRL
     delete fMIDIInterface;
     delete fMIDIHandler;
+#endif
+#ifdef SOUNDFILE
+    delete fSoundUI;
 #endif
 }
 
@@ -133,12 +144,12 @@ void AudioFaust::stop()
     fAudio->stop();
 }
 
-void AudioFaust::setParamValue(const std::string& path, float value)
+void AudioFaust::setParamValue(const string& path, float value)
 {
     fUI->setParamValue(path, value);
 }
 
-float AudioFaust::getParamValue(const std::string& path)
+float AudioFaust::getParamValue(const string& path)
 {
     return fUI->getParamValue(path);
 }

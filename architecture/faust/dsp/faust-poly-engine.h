@@ -29,6 +29,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "faust/dsp/dsp.h"
 #include "faust/audio/audio.h"
@@ -62,7 +63,7 @@ class FaustPolyEngine {
         midi_handler fMidiHandler;
         MidiUI fMidiUI;
     
-        void init(dsp* mono_dsp, audio* driver, midi_handler* midi)
+        void init(dsp* mono_dsp, audio* driver, midi_handler* handler)
         {
             bool midi_sync = false;
             int nvoices = 0;
@@ -83,8 +84,6 @@ class FaustPolyEngine {
             if (nvoices > 0) {
                 
                 fPolyDSP = new mydsp_poly(mono_dsp, nvoices, true);
-                fMidiHandler.addMidiIn(fPolyDSP);
-                if (midi) midi->addMidiIn(fPolyDSP);
                 
             #if POLY2
                 fFinalDSP = new dsp_sequencer(fPolyDSP, new effect());
@@ -102,7 +101,7 @@ class FaustPolyEngine {
                 fJSONMeta = jsonui2M.JSON();
                 
             } else {
-                fPolyDSP = NULL;
+                fPolyDSP = nullptr;
                 fFinalDSP = mono_dsp;
             }
             
@@ -122,26 +121,27 @@ class FaustPolyEngine {
       
             MyMeta meta;
             fFinalDSP->metadata(&meta);
-            if (midi) midi->setName(meta.fName);
+            if (handler) handler->setName(meta.fName);
             
             if (driver) {
                 // If driver cannot be initialized, start will fail later on...
                 if (!driver->init(meta.fName.c_str(), fFinalDSP)) {
                     delete driver;
-                    fDriver = NULL;
+                    fDriver = nullptr;
                 } else {
                     fDriver = driver;
                 }
             } else {
-                fDriver = NULL;
+                fDriver = nullptr;
             }
         }
     
     public:
     
-        FaustPolyEngine(dsp* mono_dsp, audio* driver = NULL, midi_handler* midi = NULL):fMidiUI(&fMidiHandler)
+        FaustPolyEngine(dsp* mono_dsp, audio* driver = nullptr, midi_handler* midi = nullptr):fMidiUI(&fMidiHandler)
         {
-            init(((mono_dsp) ? mono_dsp : new mydsp()), driver, midi);
+            assert(mono_dsp);
+            init(mono_dsp, driver, midi);
         }
     
         virtual ~FaustPolyEngine()
@@ -185,16 +185,12 @@ class FaustPolyEngine {
             }
         }
     
-        void setGroup(bool group) { if (fPolyDSP) fPolyDSP->setGroup(group); }
-        bool getGroup() { return (fPolyDSP) ? fPolyDSP->getGroup() : false; }
-    
         /*
          * keyOn(pitch, velocity)
          * Instantiates a new polyphonic voice where velocity
          * and pitch are MIDI numbers (0-127). keyOn can only
-         * be used if the [style:poly] metadata is used in the
-         * Faust code. keyOn will return 0 if the object is not
-         * polyphonic and the allocated voice otherwise.
+         * be used if nvoices > 0. keyOn will return 0 if the
+         * object is not polyphonic and the allocated voice otherwise.
          */
         MapUI* keyOn(int pitch, int velocity)
         {
@@ -209,11 +205,10 @@ class FaustPolyEngine {
          * keyOff(pitch)
          * De-instantiates a polyphonic voice where pitch is the
          * MIDI number of the note (0-127). keyOff can only be
-         * used if the [style:poly] metadata is used in the Faust
-         * code. keyOn will return 0 if the object is not polyphonic
-         * and 1 otherwise.
+         * used if nvoices > 0. keyOff will return 0 if the
+         * object is not polyphonic and 1 otherwise.
          */
-        int keyOff(int pitch, int velocity = 127)
+        int keyOff(int pitch, int velocity = 0)
         {
             if (fPolyDSP) {
                 fPolyDSP->keyOff(0, pitch, velocity);
@@ -278,6 +273,7 @@ class FaustPolyEngine {
             if (count == 3) fMidiHandler.handleData2(time, type, channel, data1, data2);
             else if (count == 2) fMidiHandler.handleData1(time, type, channel, data1);
             else if (count == 1) fMidiHandler.handleSync(time, type);
+            // In POLY mode, update all voices
             GUI::updateAllGuis();
         }
     
@@ -332,12 +328,12 @@ class FaustPolyEngine {
         {
             int id = (address) ? fAPIUI.getParamIndex(address) : -1;
             if (id >= 0) {
-                fAPIUI.setParamValue(id, value);
-                // In POLY mode, update all voices
-                GUI::updateAllGuis();
+                setParamValue(id, value);
+            } else {
+                fprintf(stderr, "setParamValue : '%s' not found\n", (address == nullptr ? "NULL" : address));
             }
         }
-
+        
         /*
          * getParamValue(address)
          * Takes the address of a parameter and returns its current
@@ -346,7 +342,12 @@ class FaustPolyEngine {
         float getParamValue(const char* address)
         {
             int id = (address) ? fAPIUI.getParamIndex(address) : -1;
-            return (id >= 0) ? fAPIUI.getParamValue(id) : 0.f;
+            if (id >= 0) {
+                return fAPIUI.getParamValue(id);
+            } else {
+                fprintf(stderr, "getParamValue : '%s' not found\n", (address == nullptr ? "NULL" : address));
+                return 0.f;
+            }
         }
     
         /*
@@ -374,7 +375,7 @@ class FaustPolyEngine {
          * setVoiceParamValue(address, voice, value)
          * Sets the value of the parameter associated with address for
          * the voice. setVoiceParamValue can only be
-         * used if the [style:poly] metadata is used in the Faust code.
+         * used if nvoices > 0.
          */
         void setVoiceParamValue(const char* address, uintptr_t voice, float value)
         {
@@ -385,7 +386,7 @@ class FaustPolyEngine {
          * setVoiceParamValue(id, voice, value)
          * Sets the value of the parameter associated with the id for
          * the voice. setVoiceParamValue can only be
-         * used if the [style:poly] metadata is used in the Faust code.
+         * used if nvoices > 0.
          */
         void setVoiceParamValue(int id, uintptr_t voice, float value)
         {
@@ -395,8 +396,7 @@ class FaustPolyEngine {
         /*
          * getVoiceParamValue(address, voice)
          * Gets the parameter value associated with address for the voice.
-         * getVoiceParamValue can only be used if the [style:poly] metadata
-         * is used in the Faust code.
+         * getVoiceParamValue can only be used if nvoices > 0.
          */
         float getVoiceParamValue(const char* address, uintptr_t voice)
         {
@@ -406,8 +406,7 @@ class FaustPolyEngine {
         /*
          * getVoiceParamValue(id, voice)
          * Gets the parameter value associated with the id for the voice.
-         * getVoiceParamValue can only be used if the [style:poly] metadata
-         * is used in the Faust code.
+         * getVoiceParamValue can only be used if nvoices > 0.
          */
         float getVoiceParamValue(int id, uintptr_t voice)
         {
@@ -430,7 +429,7 @@ class FaustPolyEngine {
          */
         const char* getVoiceParamAddress(int id, uintptr_t voice)
         {
-            return reinterpret_cast<MapUI*>(voice)->getParamAddress(id).c_str();
+            return reinterpret_cast<MapUI*>(voice)->getParamAddress1(id);
         }
         
         /*
@@ -516,6 +515,7 @@ class FaustPolyEngine {
         void propagateAcc(int acc, float v)
         {
             fAPIUI.propagateAcc(acc, v);
+            // In POLY mode, update all voices
             GUI::updateAllGuis();
         }
 
@@ -535,6 +535,7 @@ class FaustPolyEngine {
         void propagateGyr(int gyr, float v)
         {
             fAPIUI.propagateGyr(gyr, v);
+            // In POLY mode, update all voices
             GUI::updateAllGuis();
         }
 
@@ -592,7 +593,10 @@ extern "C" {
 
     int getParamsCount(void* dsp) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamsCount(); }
     
-    void setParamValue(void* dsp, const char* address, float value) { reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(address, value); }
+    void setParamValue(void* dsp, const char* address, float value)
+    {
+        reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(address, value);
+    }
     float getParamValue(void* dsp, const char* address) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamValue(address); }
    
     void setParamIdValue(void* dsp, int id, float value) { reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(id, value); }
@@ -602,7 +606,10 @@ extern "C" {
     {
         reinterpret_cast<FaustPolyEngine*>(dsp)->setVoiceParamValue(address, voice, value);
     }
-    float getVoiceParamValue(void* dsp, const char* address, uintptr_t voice) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getVoiceParamValue(address, voice); }
+    float getVoiceParamValue(void* dsp, const char* address, uintptr_t voice)
+    {
+        return reinterpret_cast<FaustPolyEngine*>(dsp)->getVoiceParamValue(address, voice);
+    }
     
     const char* getParamAddress(void* dsp, int id) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamAddress(id); }
 
@@ -625,4 +632,4 @@ extern "C" {
 #endif
 
 #endif // __faust_poly_engine__
-/**************************  END  faust-poly-engine.h **************************/
+/************************** END faust-poly-engine.h **************************/

@@ -4,7 +4,7 @@
 . faustoptflags
 . usage.sh
 
-CXXFLAGS=$MYGCCFLAGS
+CXXFLAGS+=" $MYGCCFLAGS"  # So that additional CXXFLAGS can be used
 
 ARCHFILE=$FAUSTARCH/netjack-console.cpp
 
@@ -56,19 +56,19 @@ do
         POLY="POLY2"
         shift
         EFFECT=$1
-   elif [ $p = "-osc" ]; then
-	 	OSCDEFS="-DOSCCTRL -lOSCFaust"
+       elif [ $p = "-osc" ]; then
+         OSCDEFS="-DOSCCTRL -lOSCFaust"
     elif [ $p = "-httpd" ]; then
-	 	HTTPDEFS="-DHTTPCTRL -lHTTPDFaust -lmicrohttpd"
+         HTTPDEFS="-DHTTPCTRL -lHTTPDFaust -lmicrohttpd"
     elif [ $p = "-midi" ]; then
         MIDIDEFS="-DMIDICTRL"
     elif [ ${p:0:1} = "-" ]; then
-	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
-	    FILES="$FILES $p"
-	else
-	    OPTIONS="$OPTIONS $p"
-	fi
+        OPTIONS="$OPTIONS $p"
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
+        FILES="$FILES $p"
+    else
+        OPTIONS="$OPTIONS $p"
+    fi
 
 shift
 
@@ -111,7 +111,10 @@ EndOfCode
     fi
 
     # compile c++ to binary
-    $CXX $CXXFLAGS "$TMP/${f%.dsp}.cpp" $FAUSTTOOLSFLAGS $ARCHLIB $OSCDEFS $HTTPDEFS $MIDIDEFS $POLYDEFS -o ${f%.dsp} || exit
+    $CXX $CXXFLAGS "$TMP/${f%.dsp}.cpp" $FAUSTTOOLSFLAGS $ARCHLIB $OSCDEFS $HTTPDEFS $MIDIDEFS $POLYDEFS -o "${f%.dsp}" || exit   
+    if [[ $(uname) == Darwin ]]; then
+        codesign --sign - --deep --force "${f%.dsp}"
+    fi   
     rm -rf "$TDR"
 
     # collect binary file name for FaustGIDE

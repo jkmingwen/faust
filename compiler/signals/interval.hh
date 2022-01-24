@@ -61,26 +61,24 @@ struct interval : public virtual Garbageable {
     interval(double n) : valid(true), lo(n), hi(n)
     {
         if (std::isnan(n)) {
-            cerr << "ERROR1 : n is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR1 : n is NaN in an Interval\n");
         }
     }
     interval(bool v, double n, double m) : valid(v), lo(n), hi(m)
     {
         if (std::isnan(n) || std::isnan(m)) {
-            cerr << "ERROR2 : n or m is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR2 : n is NaN in an Interval\n");
         }
     }
     interval(double n, double m) : valid(true), lo(min(n, m)), hi(max(n, m))
     {
         if (std::isnan(n) || std::isnan(m)) {
-            cerr << "ERROR3 : n or m is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR3 : n is NaN in an Interval\n");
         }
     }
 
-    // bool isvalid() { return valid; }
+    bool isvalid() { return valid; }
+    bool isbounded() { return !(std::isinf(lo) || std::isinf(hi)); }
     bool isempty() { return hi < lo; }
     bool isconst() { return valid && (lo == hi); }
     bool ispowerof2()
@@ -94,15 +92,36 @@ struct interval : public virtual Garbageable {
         return isconst() && ((n & (-n)) == n);
     }
     bool haszero() { return (lo <= 0) && (0 <= hi); }
+
+    // convention, the invalid interval contains everyone 
+    bool contains(interval j)
+    {
+        return !valid || (lo <= j.lo && hi >= j.hi);
+    }
+    
+    /**
+     * @brief Pretty print an interval (string version)
+     * @details usage of stringsteams seems problematic for old versions of gcc
+     * @return a string representing the interval if valid, ??? otherwise
+     */
+    string toString() const
+    {
+        string sout = ("[");
+        if (valid) {
+            sout += (lo > -HUGE_VAL)?to_string(lo):"-inf";
+            sout += ", ";
+            sout += (hi < HUGE_VAL)?to_string(hi):"inf";
+        } else {
+            sout += "???";
+        }
+        sout += "]";
+        return sout;
+    }
 };
 
 inline ostream& operator<<(ostream& dst, const interval& i)
 {
-    if (i.valid) {
-        return dst << "interval(" << i.lo << ", " << i.hi << ")";
-    } else {
-        return dst << "interval()";
-    }
+    return dst << i.toString();
 }
 
 inline interval reunion(const interval& x, const interval& y)
@@ -230,8 +249,8 @@ inline interval operator>>(const interval& x, const interval& y)
 }
 
 // ---------------------comparaisons------------------------------
-// note : les comparaisons ne portent pas sur les intervals
-// mais l'interval des comparaisons de signaux
+// Note : the comparisons are not about the intervals
+// but the interval of the signal comparisons
 
 inline interval operator<(const interval&, const interval&)
 {
@@ -313,6 +332,35 @@ inline interval abs(const interval& x)
     } else {
         return x;
     }
+}
+
+/**
+ * @struct res
+ * the fixed-point resolution of the signal
+ * i.e. the index of the least significant bit of the fixed-point representation of the signal.
+ * which is a _relative_ number.
+ */
+
+struct res : public virtual Garbageable {
+    bool valid;  ///< true if a resolution has indeed been compiled
+    int  index;  ///< the index of the lsb, if any
+
+    res() : valid(false), index(0) {}
+    res(int i) : valid(true), index(i) {}
+
+    string toString() const
+    {
+        string sout;
+        sout += "r(";
+        sout += valid ? to_string(index) : "???";
+        sout += ")";
+        return sout;
+    }
+};
+
+inline ostream& operator<<(ostream& dst, const res& r)
+{
+    return dst << r.toString();
 }
 
 #endif

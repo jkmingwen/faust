@@ -27,7 +27,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <iostream>
+#include <stdio.h>
 
 #include "faust/gui/Soundfile.h"
 
@@ -181,7 +181,7 @@ struct Reader {
         
         read(buffer, 4);
         if (strncmp(buffer, "RIFF", 4) != 0) {
-            std::cerr << "This is not valid WAV file!\n";
+            fprintf(stderr, "This is not valid WAV file!\n");
             return false;
         }
         fWave->chunk_id = convert_to_int(buffer, 4);
@@ -252,11 +252,11 @@ struct FileReader : public Reader {
     {
         fFile = fopen(file_path.c_str(), "rb");
         if (!fFile) {
-            std::cerr << "FileReader : cannot open file!\n";
+            fprintf(stderr, "FileReader : cannot open file!\n");
             throw -1;
         }
         if (!load_wave_header()) {
-            std::cerr << "FileReader : not a WAV file!\n";
+            fprintf(stderr, "FileReader : not a WAV file!\n");
             throw -1;
         }
     }
@@ -287,7 +287,7 @@ struct MemoryReader : public Reader {
         fStart = start;
         fEnd = end;
         if (!load_wave_header()) {
-            std::cerr << "MemoryReader : not a WAV file!\n";
+            fprintf(stderr, "MemoryReader : not a WAV file!\n");
             throw -1;
         }
     }
@@ -303,59 +303,54 @@ struct MemoryReader : public Reader {
     
 };
 
-
 // Using a FileReader to implement SoundfileReader
 
 struct WaveReader : public SoundfileReader {
     
     WaveReader() {}
+    virtual ~WaveReader() {}
     
-    bool checkFile(const std::string& path_name)
+    virtual bool checkFile(const std::string& path_name)
     {
         try {
-            Reader* reader = new FileReader(path_name);
-            delete reader;
+            FileReader reader(path_name);
             return true;
-        } catch(...)  {
+        } catch (...)  {
             return false;
         }
     }
     
-    void getParamsFile(const std::string& path_name, int& channels, int& length)
+    virtual void getParamsFile(const std::string& path_name, int& channels, int& length)
     {
-        Reader* reader = new FileReader(path_name);
-        assert(reader);
-        channels = reader->fWave->num_channels;
-        length = (reader->fWave->subchunk_2_size * 8) / (reader->fWave->num_channels * reader->fWave->bits_per_sample);
-        delete reader;
+        FileReader reader(path_name);
+        channels = reader.fWave->num_channels;
+        length = (reader.fWave->subchunk_2_size * 8) / (reader.fWave->num_channels * reader.fWave->bits_per_sample);
     }
     
-    void readFile(Soundfile* soundfile, const std::string& path_name, int part, int& offset, int max_chan)
+    virtual void readFile(Soundfile* soundfile, const std::string& path_name, int part, int& offset, int max_chan)
     {
-        Reader* reader = new FileReader(path_name);
-        assert(reader);
-        reader->load_wave();
+        FileReader reader(path_name);
+        reader.load_wave();
         
-        soundfile->fLength[part] = (reader->fWave->subchunk_2_size * 8) / (reader->fWave->num_channels * reader->fWave->bits_per_sample);
-        soundfile->fSR[part] = reader->fWave->sample_rate;
+        soundfile->fLength[part] = (reader.fWave->subchunk_2_size * 8) / (reader.fWave->num_channels * reader.fWave->bits_per_sample);
+        soundfile->fSR[part] = reader.fWave->sample_rate;
         soundfile->fOffset[part] = offset;
         
         // Audio frames have to be written for each chan
-        if (reader->fWave->bits_per_sample == 16) {
+        if (reader.fWave->bits_per_sample == 16) {
             float factor = 1.f/32767.f;
             for (int sample = 0; sample < soundfile->fLength[part]; sample++) {
-                short* frame = (short*)&reader->fWave->data[reader->fWave->block_align * sample];
-                for (int chan = 0; chan < reader->fWave->num_channels; chan++) {
+                short* frame = (short*)&reader.fWave->data[reader.fWave->block_align * sample];
+                for (int chan = 0; chan < reader.fWave->num_channels; chan++) {
                     soundfile->fBuffers[chan][offset + sample] = frame[chan] * factor;
                 }
             }
-        } else if (reader->fWave->bits_per_sample == 32) {
-            std::cerr << "readFile : not implemented \n";
+        } else if (reader.fWave->bits_per_sample == 32) {
+            fprintf(stderr, "readFile : not implemented\n");
         }
         
         // Update offset
         offset += soundfile->fLength[part];
-        delete reader;
     }
 };
 

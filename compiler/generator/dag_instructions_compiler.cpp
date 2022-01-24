@@ -87,10 +87,6 @@ void DAGInstructionsCompiler::compileMultiSignal(Tree L)
             Tree   sig  = hd(L);
             string name = subst("output$0", T(index));
 
-            // 09/12/11 : HACK
-            // int rate = getSigRate(sig);
-            int rate = 1;
-            fContainer->setOutputRate(index, rate);
             fContainer->openLoop("i");
 
             // Cast to external float
@@ -106,15 +102,17 @@ void DAGInstructionsCompiler::compileMultiSignal(Tree L)
             Tree   sig  = hd(L);
             string name = subst("output$0", T(index));
 
-            // 09/12/11 : HACK
-            // int rate = getSigRate(sig);
-            int rate = 1;
-            fContainer->setOutputRate(index, rate);
             fContainer->openLoop("i");
 
             // Cast to external float
             ValueInst* res = InstBuilder::genCastFloatMacroInst(CS(sig));
-            pushComputeDSPMethod(InstBuilder::genStoreArrayStackVar(name, getCurrentLoopIndex(), res));
+            
+            if (gGlobal->gComputeMix) {
+                ValueInst* res1 = InstBuilder::genAdd(res, InstBuilder::genLoadArrayStackVar(name, getCurrentLoopIndex()));
+                pushComputeDSPMethod(InstBuilder::genStoreArrayStackVar(name, getCurrentLoopIndex(), res1));
+            } else {
+                pushComputeDSPMethod(InstBuilder::genStoreArrayStackVar(name, getCurrentLoopIndex(), res));
+            }
 
             fContainer->closeLoop(sig);
         }
@@ -167,11 +165,11 @@ ValueInst* DAGInstructionsCompiler::CS(Tree sig)
             // cerr << "CASE SH : fBackwardLoopDependencies.insert : " << tl << " --depend(A)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
 
-        } else if (isSigFixDelay(sig, x, d) && fContainer->getLoopProperty(x, ls)) {
+        } else if (isSigDelay(sig, x, d) && fContainer->getLoopProperty(x, ls)) {
             // cerr << "CASE DL : fBackwardLoopDependencies.insert : " << tl << " --depend(B)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
 
-        } else if (isSigFixDelay(sig, x, d) && isProj(x, &i, r) && fContainer->getLoopProperty(r, ls)) {
+        } else if (isSigDelay(sig, x, d) && isProj(x, &i, r) && fContainer->getLoopProperty(r, ls)) {
             // cerr << "CASE DR : fBackwardLoopDependencies.insert : " << tl << " --depend(B)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
         }
@@ -286,7 +284,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
     Typed::VarType ctype;
     int            sharing = getSharingCount(sig);
     ::Type         t       = getCertifiedSigType(sig);
-    Occurences*    o       = fOccMarkup.retrieve(sig);
+    old_Occurences*    o   = fOccMarkup->retrieve(sig);
     int            d       = o->getMaxDelay();
 
     if (t->variability() < kSamp) {
@@ -304,13 +302,13 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
                 // first cache this expression because it
                 // it is shared and complex
                 ValueInst* cachedexp = generateVariableStore(sig, exp);
-                generateDelayLine(cachedexp, ctype, vname, d, var_access);
+                generateDelayLine(cachedexp, ctype, vname, d, var_access, nullptr);
                 setVectorNameProperty(sig, vname);
                 return cachedexp;
             } else {
                 // no need to cache this expression because
                 // it is either not shared or very simple
-                generateDelayLine(exp, ctype, vname, d, var_access);
+                generateDelayLine(exp, ctype, vname, d, var_access, nullptr);
                 setVectorNameProperty(sig, vname);
                 return exp;
             }
@@ -321,7 +319,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
             // used delayed : we need a delay line
             getTypedNames(getCertifiedSigType(sig), "Yec", ctype, vname);
             Address::AccessType var_access;
-            generateDelayLine(exp, ctype, vname, d, var_access);
+            generateDelayLine(exp, ctype, vname, d, var_access, nullptr);
             setVectorNameProperty(sig, vname);
 
             if (verySimple(sig)) {
@@ -342,7 +340,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
         } else {
             // not delayed
             Tree x, y;
-            if (sharing > 1 && isSigFixDelay(sig, x, y) && verySimple(y)) {
+            if (sharing > 1 && isSigDelay(sig, x, y) && verySimple(y)) {
                 // cerr << "SPECIAL CASE NO CACHE NEEDED : " << ppsig(sig) << endl;
                 return exp;
             } else if (sharing > 1 && !verySimple(sig)) {
@@ -350,7 +348,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
                 // cerr << "Zec : " << ppsig(sig) << endl;
                 getTypedNames(getCertifiedSigType(sig), "Zec", ctype, vname);
                 Address::AccessType var_access;
-                generateDelayLine(exp, ctype, vname, d, var_access);
+                generateDelayLine(exp, ctype, vname, d, var_access, nullptr);
                 setVectorNameProperty(sig, vname);
                 // return subst("$0[i]", vname);
                 return InstBuilder::genLoadArrayVar(vname, var_access, getCurrentLoopIndex());
@@ -371,7 +369,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
  */
 bool DAGInstructionsCompiler::needSeparateLoop(Tree sig)
 {
-    Occurences* o = fOccMarkup.retrieve(sig);
+    old_Occurences* o = fOccMarkup->retrieve(sig);
     ::Type      t = getCertifiedSigType(sig);
     int         c = getSharingCount(sig);
     bool        b;
@@ -383,7 +381,7 @@ bool DAGInstructionsCompiler::needSeparateLoop(Tree sig)
         b = true;
     } else if (verySimple(sig) || t->variability() < kSamp) {
         b = false;  // non sample computation never require a loop
-    } else if (isSigFixDelay(sig, x, y)) {
+    } else if (isSigDelay(sig, x, y)) {
         b = false;
     } else if (isProj(sig, &i, x)) {
         b = true;
@@ -434,11 +432,11 @@ ValueInst* DAGInstructionsCompiler::generateInput(Tree sig, int idx)
     }
 }
 
-ValueInst* DAGInstructionsCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay)
+ValueInst* DAGInstructionsCompiler::generateDelay(Tree sig, Tree exp, Tree delay)
 {
     string     vname;
     ValueInst* code = CS(exp);  // ensure exp is compiled to have a vector name
-    int        d, mxd = fOccMarkup.retrieve(exp)->getMaxDelay();
+    int        d, mxd = fOccMarkup->retrieve(exp)->getMaxDelay();
 
     if (!getVectorNameProperty(exp, vname)) {
         if (mxd == 0) {
@@ -506,7 +504,7 @@ ValueInst* DAGInstructionsCompiler::generateDelayVec(Tree sig, ValueInst* exp, T
 
     setVectorNameProperty(sig, vname);
     Address::AccessType var_access;
-    generateDelayLine(exp, ctype, vname, mxd, var_access);
+    generateDelayLine(exp, ctype, vname, mxd, var_access, nullptr);
 
     if (verySimple(sig)) {
         return exp;
@@ -516,7 +514,7 @@ ValueInst* DAGInstructionsCompiler::generateDelayVec(Tree sig, ValueInst* exp, T
 }
 
 ValueInst* DAGInstructionsCompiler::generateDelayLine(ValueInst* exp, Typed::VarType ctype, const string& vname,
-                                                      int mxd, Address::AccessType& var_access)
+                                                      int mxd, Address::AccessType& var_access, ValueInst* unused)
 {
     if (mxd == 0) {
         generateVectorLoop(ctype, vname, exp, var_access);

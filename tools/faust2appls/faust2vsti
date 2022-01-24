@@ -10,6 +10,8 @@
 . faustpath
 . faustoptflags
 
+CXXFLAGS+=" $MYGCCFLAGS -Wfatal-errors"  # So that additional CXXFLAGS can be used
+
 # VST specific sdk files
 #------------------------
 VSTSDK="/usr/local/include/vstsdk2.4"
@@ -21,8 +23,6 @@ INCLUDES="-I$VSTSDK/ -I$VSTSDK/public.sdk/source/vst2.x/"
 LIBS=" -framework Carbon -framework CoreServices"
 
 SOURCES=" $VSTSDK/public.sdk/source/vst2.x/audioeffect.cpp $VSTSDK/public.sdk/source/vst2.x/audioeffectx.cpp $VSTSDK/public.sdk/source/vst2.x/vstplugmain.cpp"
-
-CXXFLAGS='-Wfatal-errors -O3 -mfpmath=sse -msse -msse2 -msse3 -ffast-math'
 
 createInfoPList() {
 	(
@@ -74,7 +74,7 @@ for p in $@; do
 		PROCARCH="-m64"
     elif [ ${p:0:1} = "-" ]; then
 	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
+	elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 	    FILES="$FILES $p"
 	else
 	    OPTIONS="$OPTIONS $p"        

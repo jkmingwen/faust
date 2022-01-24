@@ -39,8 +39,6 @@ class ExpPrim : public xtended {
         return floatCast(args[0]);
     }
 
-    virtual void sigVisit(Tree sig, sigvisitor* visitor) {}
-
     virtual int infereSigOrder(const vector<int>& args)
     {
         faustassert(args.size() == arity());
@@ -51,7 +49,12 @@ class ExpPrim : public xtended {
     {
         num n;
         faustassert(args.size() == arity());
-        if (isNum(args[0], n)) {
+    
+        // exp(log(sig)) ==> sig
+        xtended* xt = (xtended*)getUserData(args[0]);
+        if (xt == gGlobal->gLogPrim) {
+            return args[0]->branch(0);
+        } else if (isNum(args[0], n)) {
             return tree(exp(double(n)));
         } else {
             return tree(symbol(), args[0]);
@@ -72,7 +75,7 @@ class ExpPrim : public xtended {
         return container->pushFunction(subst("exp$0", isuffix()), result_type, arg_types, casted_args);
     }
 
-    virtual string old_generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
+    virtual string generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());

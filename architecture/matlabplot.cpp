@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN matlabplot.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -98,15 +97,12 @@ int main(int argc, char* argv[])
     interface->addOption("-us", &up_sample, 1.0, 1.0, 16.0);
     interface->addOption("-filter", &filter_type, 1.0, 1.0, 4.0);
     
-    // modify the UI values according to the command-line options:
-    interface->process_command();
-    
     if ((down_sample != 1.0) && (up_sample != 1.0)) {
         cerr << "ERROR : -ds '" << down_sample << "' and -us '" << up_sample << "' cannot be used at the same time !\n";
         exit(1);
     }
    
-    // Setup up/down sampling, FC factor is expressed as a Double<INT,DENOM> to allow template specialization
+    // setup up/down sampling, FC factor is expressed as a Double<INT,DENOM> to allow template specialization
     int filter = int(filter_type);
     if (down_sample != 1.0) {
         int ds = int(down_sample);
@@ -180,8 +176,14 @@ int main(int argc, char* argv[])
         }
     }
     
-    // init signal processor and the user interface values:
+    // SR has to be read before DSP init
+    interface->process_one_init("-r");
+    
+    // init signal processor and the user interface values
     DSP->init(int(sample_rate));
+
+    // modify the UI values according to the command line options, after init
+    interface->process_command();
 
     // prepare input channels (if any) with an impulse
     int nins = DSP->getNumInputs();
@@ -213,7 +215,7 @@ int main(int argc, char* argv[])
     int nbsamples = int(nb_samples);
     cout << setprecision(numeric_limits<FAUSTFLOAT>::max_digits10);
 
-    // Print by buffer
+    // print by buffer
     while (nbsamples > kFrames) {
         DSP->compute(kFrames, inchan.buffers(), outchan.buffers());
         inchan.zero();
@@ -230,7 +232,7 @@ int main(int argc, char* argv[])
         nbsamples -= kFrames;
     }
 
-    // Print remaining frames
+    // print remaining frames
     if (nbsamples) { 
         DSP->compute(nbsamples, inchan.buffers(), outchan.buffers());
         inchan.zero();
@@ -260,5 +262,4 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
-
+/******************* END matlabplot.cpp ****************/

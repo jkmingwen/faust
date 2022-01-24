@@ -52,13 +52,10 @@
 #define MovePTR(ptr) std::move(ptr)
 #define PASS_MANAGER legacy::PassManager
 #define FUNCTION_PASS_MANAGER legacy::FunctionPassManager
-#define sysfs_binary_flag sys::fs::F_None
+#define sysfs_binary_flag sys::fs::OF_None
 #define OwningPtr std::unique_ptr
 #define llvmcreatePrintModulePass(out) createPrintModulePass(out)
 #define GET_CPU_NAME llvm::sys::getHostCPUName().str()
-
-// We take the largest sample size here, to cover 'float' and 'double' cases
-#define LLVM_FAUSTFLOAT double
 
 #define BUFFER_SIZE 1024
 #define SAMPLE_RATE 44100
@@ -77,15 +74,17 @@ __pragma(pack(pop))
 
 PRE_PACKED_STRUCTURE
 struct Soundfile {
-    LLVM_FAUSTFLOAT** fBuffers;
-    int* fLength;   // length of each part
-    int* fSR;       // sample rate of each part
-    int* fOffset;   // offset of each part in the global buffer
-    int fChannels;  // max number of channels of all concatenated files
+    double** fBuffers; // use the largest size to cover 'float' and 'double' cases
+    int* fLength;      // length of each part
+    int* fSR;          // sample rate of each part
+    int* fOffset;      // offset of each part in the global buffer
+    int fChannels;     // max number of channels of all concatenated files
+    int fParts;        // the total number of loaded parts
+    bool fIsDouble;    // keep the sample format (float or double)
  
     Soundfile(int max_chan)
     {
-        fBuffers = new LLVM_FAUSTFLOAT*[max_chan];
+        fBuffers = new double*[max_chan];
         fLength  = new int[MAX_SOUNDFILE_PARTS];
         fSR      = new int[MAX_SOUNDFILE_PARTS];
         fOffset  = new int[MAX_SOUNDFILE_PARTS];
@@ -97,10 +96,12 @@ struct Soundfile {
         }
         
         // Allocate 1 channel
-        fChannels   = 1;
-        fBuffers[0] = new LLVM_FAUSTFLOAT[BUFFER_SIZE];
+        fChannels = 1;
+        fParts = 0;
+        fBuffers[0] = new double[BUFFER_SIZE];
+        fIsDouble = true;
         faustassert(fBuffers[0]);
-        memset(fBuffers[0], 0, BUFFER_SIZE * sizeof(LLVM_FAUSTFLOAT));
+        memset(fBuffers[0], 0, BUFFER_SIZE * sizeof(double));
         
         // Share the same buffer for all other channels so that we have max_chan channels available
         for (int chan = fChannels; chan < max_chan; chan++) {
@@ -112,7 +113,7 @@ struct Soundfile {
     {
         // Free the real channels only
         for (int chan = 0; chan < fChannels; chan++) {
-            delete fBuffers[chan];
+            delete[] fBuffers[chan];
         }
         delete[] fBuffers;
         delete[] fLength;
@@ -138,6 +139,7 @@ class llvm_dsp_factory;
 class EXPORT llvm_dsp : public dsp {
    private:
     llvm_dsp_factory* fFactory;
+    JSONUIDecoderBase* fDecoder;
     dsp_imp*          fDSP;
 
    public:
@@ -180,6 +182,8 @@ class EXPORT llvm_dsp : public dsp {
 class FaustObjectCache : public llvm::ObjectCache {
    private:
     std::string fMachineCode;
+    
+    virtual void anchor() {}
 
    public:
     FaustObjectCache(const std::string& machine_code = "") : fMachineCode(machine_code) {}
@@ -208,13 +212,14 @@ typedef const char* (* getJSONFun) ();
 
 class llvm_dsp_factory_aux : public dsp_factory_imp {
     friend class llvm_dsp;
+    friend class llvm_dsp_factory;
 
    protected:
     llvm::ExecutionEngine*  fJIT;
     FaustObjectCache*       fObjectCache;
     llvm::Module*           fModule;
     llvm::LLVMContext*      fContext;
-    JSONUITemplatedDecoder* fDecoder;
+    JSONUIDecoderBase*      fDecoder;
 
     int         fOptLevel;
     std::string fTarget;
@@ -260,7 +265,7 @@ class llvm_dsp_factory_aux : public dsp_factory_imp {
     std::vector<std::string> getIncludePathnames();
 
     virtual bool initJIT(std::string& error_msg);
-    bool         initJITAux(std::string& error_msg);
+    bool         initJITAux();
 
     static llvm_dsp_factory* readDSPFactoryFromMachineAux(MEMORY_BUFFER buffer, const std::string& target,
                                                           std::string& error_msg);
@@ -318,8 +323,7 @@ class EXPORT llvm_dsp_factory : public dsp_factory, public faust_smartable {
 
    public:
     llvm_dsp_factory(llvm_dsp_factory_aux* factory) : fFactory(factory) {}
-    llvm_dsp_factory(dsp_factory_base* factory) : fFactory(static_cast<llvm_dsp_factory_aux*>(factory)) {}
-
+  
     std::string getName() { return fFactory->getName(); }
 
     std::string getSHAKey() { return fFactory->getSHAKey(); }

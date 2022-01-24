@@ -53,6 +53,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <iostream>
+
 #include "garbageable.hh"
 #include "symbol.hh"
 
@@ -133,7 +134,7 @@ inline ostream& operator<<(ostream& s, const Node& n)
 }
 
 //-------------------------------------------------------------------------
-// Perdicates and pattern matching
+// Predicates and pattern matching
 //-------------------------------------------------------------------------
 
 // integers
@@ -300,7 +301,12 @@ inline const Node lshNode(const Node& x, const Node& y)
     return Node(int(x) << int(y));
 }
 
-inline const Node rshNode(const Node& x, const Node& y)
+inline const Node arshNode(const Node& x, const Node& y)
+{
+    return Node(int(x) >> int(y));
+}
+
+inline const Node lrshNode(const Node& x, const Node& y)
 {
     return Node(int(x) >> int(y));
 }

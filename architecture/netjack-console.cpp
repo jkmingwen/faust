@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN netjack-console.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -100,8 +99,7 @@ int main(int argc, char* argv[])
     bool midi_sync = false;
     int nvoices = 0;
     bool control = true;
-    mydsp_poly* dsp_poly = NULL;
-
+  
     int celt = lopt(argv, "--c", -1);
     const char* master_ip = lopts(argv, "--a", DEFAULT_MULTICAST_IP);
     int master_port = lopt(argv, "--p", DEFAULT_PORT);
@@ -124,16 +122,16 @@ int main(int argc, char* argv[])
     int group = lopt(argv, "--group", 1);
     
     cout << "Started with " << nvoices << " voices\n";
-    dsp_poly = new mydsp_poly(new mydsp(), nvoices, control, group);
+    DSP = new mydsp_poly(new mydsp(), nvoices, control, group);
     
 #if MIDICTRL
     if (midi_sync) {
-        DSP = new timed_dsp(new dsp_sequencer(dsp_poly, new effect()));
+        DSP = new timed_dsp(new dsp_sequencer(DSP, new effect()));
     } else {
-        DSP = new dsp_sequencer(dsp_poly, new effect());
+        DSP = new dsp_sequencer(DSP, new effect());
     }
 #else
-    DSP = new dsp_sequencer(dsp_poly, new effect());
+    DSP = new dsp_sequencer(DSP, new effect());
 #endif
     
 #else
@@ -143,16 +141,12 @@ int main(int argc, char* argv[])
     
     if (nvoices > 0) {
         cout << "Started with " << nvoices << " voices\n";
-        dsp_poly = new mydsp_poly(new mydsp(), nvoices, control, group);
+        DSP = new mydsp_poly(new mydsp(), nvoices, control, group);
         
 #if MIDICTRL
         if (midi_sync) {
-            DSP = new timed_dsp(dsp_poly);
-        } else {
-            DSP = dsp_poly;
+            DSP = new timed_dsp(DSP);
         }
-#else
-        DSP = dsp_poly;
 #endif
     } else {
 #if MIDICTRL
@@ -198,7 +192,7 @@ int main(int argc, char* argv[])
     // First restore the state
     finterface.recallState(rcfilename);
     
-    // The process commands and possibly update it
+    // The process commands possibly update it
     interface.process_command();
     
     if (!audio.start()) {
@@ -209,7 +203,6 @@ int main(int argc, char* argv[])
 #ifdef MIDICTRL
     MidiUI* midiinterface = new MidiUI(&audio);
     DSP->buildUserInterface(midiinterface);
-    audio.addMidiIn(dsp_poly);
     cout << "MIDI is on" << endl;
 #endif
 
@@ -250,5 +243,4 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
-
+/******************* END netjack-console.cpp ****************/

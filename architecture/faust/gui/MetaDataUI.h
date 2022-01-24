@@ -34,6 +34,7 @@
 #include <string>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h> // We use the lighter fprintf code
 
 #include "faust/gui/SimpleParser.h"
 
@@ -107,6 +108,7 @@ class MetaDataUI {
             fLogSet.clear();
             fExpSet.clear();
             fHiddenSet.clear();
+            fGroupTooltip = "";
         }
         
         /**
@@ -127,7 +129,7 @@ class MetaDataUI {
         /**
          * Format tooltip string by replacing some white spaces by
          * return characters so that line width doesn't exceed n.
-         * Limitation : long words exceeding n are not cut
+         * Limitation : long words exceeding n are not cut.
          */
         std::string formatTooltip(int n, const std::string& tt)
         {
@@ -253,8 +255,8 @@ class MetaDataUI {
                                 if (deep < 1) {
                                     metadata[rmWhiteSpaces(key)] = "";
                                     state = kLabel;
-                                    key="";
-                                    value="";
+                                    key = "";
+                                    value = "";
                                 } else {
                                     key += c;
                                 }
@@ -291,14 +293,14 @@ class MetaDataUI {
                         break;
                         
                     default:
-                        std::cerr << "ERROR unrecognized state " << state << std::endl;
+                        fprintf(stderr, "ERROR unrecognized state %d\n", state);
                 }
             }
             label = rmWhiteSpaces(label);
         }
         
         /**
-         * Analyses the widget zone metadata declarations and takes appropriate actions
+         * Analyses the widget zone metadata declarations and takes appropriate actions.
          */
         void declare(FAUSTFLOAT* zone, const char* key, const char* value)
         {

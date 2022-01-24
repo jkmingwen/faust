@@ -33,21 +33,18 @@
 extern "C" {
 #endif
 
-//#include "mir.h"
-//#include "mir-gen.h"
-
-#include "/Documents/JIT-compilation/mir/mir.h"
-#include "/Documents/JIT-compilation/mir/mir-gen.h"
+#include <mir.h>
+#include <mir-gen.h>
     
 #ifdef __cplusplus
 }
 #endif
 
-#define typedReal(op1, op2) ((sizeof(T) == sizeof(float)) ? op1 : op2)
+#define typedReal(op1, op2) ((sizeof(REAL) == sizeof(float)) ? op1 : op2)
 
 // FBC MIR compiler
-template <class T>
-class FBCMIRCompiler : public FBCExecuteFun<T> {
+template <class REAL>
+class FBCMIRCompiler : public FBCExecuteFun<REAL> {
 
     typedef void (*compiledFun)(MIR_val_t int_heap, MIR_val_t real_heap, MIR_val_t inputs, MIR_val_t outputs);
 
@@ -85,13 +82,13 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
    
     MIR_op_t genFloat(float num) { return MIR_new_float_op(fContext, num); }
     MIR_op_t genDouble(double num) { return MIR_new_double_op(fContext, num); }
-    MIR_op_t genReal(double num) { return (sizeof(T) == sizeof(double)) ? genDouble(num) : genFloat(num); }
+    MIR_op_t genReal(double num) { return (sizeof(REAL) == sizeof(double)) ? genDouble(num) : genFloat(num); }
     MIR_op_t genInt32(int num) { return MIR_new_int_op(fContext, num); }
-    MIR_op_t genInt64(long long num) { return MIR_new_int_op(fContext, num); }
+    MIR_op_t genInt64(int64_t num) { return MIR_new_int_op(fContext, num); }
 
     MIR_type_t getFloatTy() { return MIR_T_F; }
     MIR_type_t getDoubleTy() { return MIR_T_D; }
-    MIR_type_t getRealTy() { return (sizeof(T) == sizeof(double)) ? getDoubleTy() : getFloatTy(); }
+    MIR_type_t getRealTy() { return (sizeof(REAL) == sizeof(double)) ? getDoubleTy() : getFloatTy(); }
     MIR_type_t getInt32Ty() { return MIR_T_I32; }
     MIR_type_t getInt64Ty() { return MIR_T_I64; }
     
@@ -100,7 +97,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
         return MIR_new_func_reg(fContext, fCompute->u.func, type, getFreshID(name));
     }
   
-    std::string getMathName(const std::string& name) { return (sizeof(T) == sizeof(float)) ? (name + "f") : name; }
+    std::string getMathName(const std::string& name) { return (sizeof(REAL) == sizeof(float)) ? (name + "f") : name; }
 
     void pushValue(MIR_reg_t val) { fMIRStack[fMIRStackIndex++] = val; }
     MIR_reg_t popValue() { return fMIRStack[--fMIRStackIndex]; }
@@ -262,7 +259,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                                                                         getRealTy(), 0,
                                                                         fMIRRealHeap,
                                                                         index_reg,
-                                                                        sizeof(T))));
+                                                                        sizeof(REAL))));
         pushValue(load_res);
     }
     
@@ -296,7 +293,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                                                          MIR_new_mem_op(fContext,
                                                                         getRealTy(), 0,
                                                                         fMIRRealHeap, index_reg,
-                                                                        sizeof(T)),
+                                                                        sizeof(REAL)),
                                                          MIR_new_reg_op(fContext, popValue())));
     }
 
@@ -322,7 +319,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                                                          MIR_new_mem_op(fContext,
                                                                         getRealTy(), 0,
                                                                         load_res_ptr, popValue(),
-                                                                        sizeof(T))));
+                                                                        sizeof(REAL))));
         pushValue(load_res);
     }
 
@@ -345,7 +342,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                                                          MIR_new_mem_op(fContext,
                                                                         getRealTy(), 0,
                                                                         store_res_ptr, popValue(),
-                                                                        sizeof(T)),
+                                                                        sizeof(REAL)),
                                                          MIR_new_reg_op(fContext, popValue())));
     }
    
@@ -464,7 +461,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
         return gMathLib[name];
     }
     
-    void CompileBlock(FBCBlockInstruction<T>* block, MIR_label_t code_block)
+    void CompileBlock(FBCBlockInstruction<REAL>* block, MIR_label_t code_block)
     {
         InstructionIT it  = block->fInstructions.begin();
         bool          end = false;
@@ -614,18 +611,18 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                 }
 
                 case FBCInstruction::kBitcastInt: {
+                    // MIR_reg_t val = popValue();
+                    // it++;
                     // TODO
                     faustassert(false);
-                    MIR_reg_t val = popValue();
-                    it++;
                     break;
                 }
 
                 case FBCInstruction::kBitcastReal: {
+                    // MIR_reg_t val = popValue();
+                    // it++;
                     // TODO
                     faustassert(false);
-                    MIR_reg_t val = popValue();
-                    it++;
                     break;
                 }
 
@@ -685,7 +682,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                     it++;
                     break;
 
-                case FBCInstruction::kRshInt:
+                case FBCInstruction::kARshInt:
                     pushBinop(MIR_RSHS, getInt64Ty());
                     it++;
                     break;
@@ -875,6 +872,24 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
                     pushUnaryRealCall("mir_tanh");
                     it++;
                     break;
+                    
+                case FBCInstruction::kIsnanf:
+                    // TODO
+                    faustassert(false);
+                    it++;
+                    break;
+                    
+                case FBCInstruction::kIsinff:
+                    // TODO
+                    faustassert(false);
+                    it++;
+                    break;
+                    
+                case FBCInstruction::kCopysignf:
+                    // TODO
+                    faustassert(false);
+                    it++;
+                    break;
 
                     // Extended binary math
                 case FBCInstruction::kAtan2f:
@@ -975,7 +990,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
     }
     
    public:
-    FBCMIRCompiler(FBCBlockInstruction<T>* fbc_block)
+    FBCMIRCompiler(FBCBlockInstruction<REAL>* fbc_block)
     {
         // Integer version
         gMathLib["mir_abs"] = (void*)mir_abs;
@@ -983,8 +998,8 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
         gMathLib["mir_min_i"] = (void*)mir_min_i;
         gMathLib["mir_max_i"] = (void*)mir_max_i;
         
-        // Float versions
-        if (sizeof(T) == sizeof(float)) {
+        if (sizeof(REAL) == sizeof(float)) {
+            // Float versions
             gMathLib["mir_fabsf"] = (void*)mir_fabsf;
             gMathLib["mir_acosf"] = (void*)mir_acosf;
             gMathLib["mir_acoshf"] = (void*)mir_acoshf;
@@ -1013,10 +1028,8 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
             
             gMathLib["mir_minf"] = (void*)mir_minf;
             gMathLib["mir_maxf"] = (void*)mir_maxf;
-        }
-        
-        // Double versions
-        if (sizeof(T) == sizeof(double)) {
+        } else if (sizeof(REAL) == sizeof(double)) {
+            // Double versions
             gMathLib["mir_fabs"] = (void*)mir_fabs;
             gMathLib["mir_acos"] = (void*)mir_acos;
             gMathLib["mir_acosh"] = (void*)mir_acosh;
@@ -1045,7 +1058,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
             
             gMathLib["mir_min"] = (void*)mir_min;
             gMathLib["mir_max"] = (void*)mir_max;
-        }
+        } 
         
         fMIRStackIndex = 0;
         fAddrStackIndex = 0;
@@ -1079,14 +1092,18 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
         
         // Finish module
         MIR_finish_module(fContext);
-        
+     
         // Load module and link
         MIR_load_module(fContext, module);
         MIR_link(fContext, MIR_set_interp_interface, importResolver);
         
         // Code generation
-        MIR_gen_init(fContext);
-        fCompiledFun = (compiledFun)MIR_gen(fContext, fCompute);
+        MIR_gen_init(fContext, 1);
+    
+        // Optimize the code (default = 2)
+        MIR_gen_set_optimize_level(fContext, 0, 2);
+    
+        fCompiledFun = (compiledFun)MIR_gen(fContext, 0, fCompute);
         MIR_gen_finish(fContext);
         
         // Print module
@@ -1098,7 +1115,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
         MIR_finish(fContext);
     }
 
-    void Execute(int* int_heap, T* real_heap, T** inputs, T** outputs)
+    void Execute(int* int_heap, REAL* real_heap, REAL** inputs, REAL** outputs)
     {
         fCompiledFun((MIR_val_t){.a = (void*)int_heap},
                      (MIR_val_t){.a = (void*)real_heap},
@@ -1116,7 +1133,7 @@ class FBCMIRCompiler : public FBCExecuteFun<T> {
     
 };
 
-template <class T>
-std::map<std::string, void*> FBCMIRCompiler<T>::gMathLib;
+template <class REAL>
+std::map<std::string, void*> FBCMIRCompiler<REAL>::gMathLib;
 
 #endif

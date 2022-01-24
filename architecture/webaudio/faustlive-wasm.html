@@ -554,7 +554,7 @@
                 } else if (cmd === 11) {
                     ctrlChange(channel, data1, data2);
                 } else if (cmd === 14) {
-                    pitchWheel(channel, ((data2 * 128.0 + data1)-8192)/8192.0);
+                    pitchWheel(channel, (data2 * 128.0 + data1));
                 }
                 
                 /*
@@ -824,9 +824,9 @@
             
             function checkPolyphonicDSP(json)
             {
-                if (!((json.indexOf("/freq") !== -1)
-                    && (json.indexOf("/gain") !== -1)
-                    && (json.indexOf("/gate") !== -1))) {
+                if (!(((json.indexOf("/freq") !== -1) || (json.indexOf("/key") !== -1))
+                    && (json.indexOf("/gate") !== -1)
+                    && ((json.indexOf("/gain") !== -1) || (json.indexOf("/vel") !== -1) || (json.indexOf("/velocity") !== -1)))) {
                     alert("Faust DSP code is not Polyphonic, it will probably not work correctly in this mode...")
                 }
             }

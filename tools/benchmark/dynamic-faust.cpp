@@ -57,7 +57,7 @@ static string replaceChar(string str, char src, char dst)
 }
 
 template <typename T>
-static vector<string> bench(dsp_optimizer<T> optimizer, const string& name)
+static vector<string> bench(dsp_optimizer_real<T> optimizer, const string& name)
 {
     pair<double, vector<string> > res = optimizer.findOptimizedParameters();
     return res.second;
@@ -66,9 +66,10 @@ static vector<string> bench(dsp_optimizer<T> optimizer, const string& name)
 int main(int argc, char* argv[])
 {
     if (argc == 1 || isopt(argv, "-h") || isopt(argv, "-help")) {
-        cout << "dynamic-faust [-target xxx] [-opt (native|generic)] [additional Faust options (-vec -vs 8...)] foo.dsp" << endl;
+        cout << "dynamic-faust [-target xxx] [-opt native|generic] [-o foo.ll|foo.bc|foo.mc|foo.o] [additional Faust options (-vec -vs 8...)] foo.dsp" << endl;
         cout << "Use '-target xxx' to cross-compile the code for a different architecture (like 'x86_64-apple-darwin15.6.0:haswell')\n";
-        cout << "Use '-opt (native|generic)' to discover and compile with the optimal compilation parameters\n";
+        cout << "Use '-opt native' to activate the best compilation options for the native CPU\n";
+        cout << "Use '-opt generic' to activate the best compilation options for a generic CPU\n";
         cout << "Use '-o foo.ll' to generate an LLVM IR textual file\n";
         cout << "Use '-o foo.bc' to generate an LLVM bitcode file\n";
         cout << "Use '-o foo.mc' to generate an LLVM machine code file\n";
@@ -82,7 +83,7 @@ int main(int argc, char* argv[])
     bool is_double = isopt(argv, "-double");
     
     string in_filename, out_filename, error_msg;
-    cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     int argc1 = 0;
     const char* argv1[64];
@@ -134,9 +135,9 @@ int main(int argc, char* argv[])
         int buffer_size = 512;
         try {
             if (is_double) {
-                optimal_options = bench(dsp_optimizer<double>(in_filename.c_str(), argc1, argv1, opt_target, buffer_size, 1, -1, false), in_filename);
+                optimal_options = bench(dsp_optimizer_real<double>(in_filename.c_str(), argc1, argv1, opt_target, buffer_size, 1, -1, false), in_filename);
             } else {
-                optimal_options = bench(dsp_optimizer<float>(in_filename.c_str(), argc1, argv1, opt_target, buffer_size, 1, -1, false), in_filename);
+                optimal_options = bench(dsp_optimizer_real<float>(in_filename.c_str(), argc1, argv1, opt_target, buffer_size, 1, -1, false), in_filename);
             }
         } catch (...) {
             cerr << "libfaust error...\n";
@@ -144,7 +145,7 @@ int main(int argc, char* argv[])
         }
         
         cout << "Compiled with optimal options : ";
-        for (int i = 0; i < optimal_options.size(); i++) {
+        for (size_t i = 0; i < optimal_options.size(); i++) {
             argv1[argc1++] = optimal_options[i].c_str();
             cout << optimal_options[i] << " ";
         }

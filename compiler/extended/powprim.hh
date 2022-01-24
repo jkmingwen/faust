@@ -43,12 +43,28 @@ class PowPrim : public xtended {
         return castInterval(args[0] | args[1], pow(i, j));
     }
 
-    virtual void sigVisit(Tree sig, sigvisitor* visitor) {}
-
     virtual int infereSigOrder(const vector<int>& args)
     {
         faustassert(args.size() == arity());
         return max(args[0], args[1]);
+    }
+    
+    // Fast integer based power, for positive exponent
+    template <typename Type1, typename Type2>
+    Type1 ipow(Type1 a, Type2 ex)
+    {
+        if (0 == ex) return 1;
+        else {
+            Type1 z = a;
+            Type1 y = 1;
+            while (true) {
+                if (ex & 1) y *= z;
+                ex /= 2;
+                if (0 == ex) break;
+                z *= z;
+            }
+            return y;
+        }
     }
 
     virtual Tree computeSigOutput(const vector<Tree>& args)
@@ -56,7 +72,11 @@ class PowPrim : public xtended {
         num n, m;
         faustassert(args.size() == arity());
         if (isNum(args[0], n) && isNum(args[1], m)) {
-            return tree(pow(double(n), double(m)));
+            if (!isfloat(n) && !isfloat(m) && int(m) > 0) {
+                return tree(ipow(int(n), int(m)));
+            } else {
+                return tree(pow(double(n), double(m)));
+            }
         } else if (isNum(args[0], n) && (double(n) == 10.) && gGlobal->gHasExp10) {
             // pow(10, x) ==> exp10(x)
             return tree(::symbol("exp10"), args[1]);
@@ -131,7 +151,7 @@ class PowPrim : public xtended {
         }
     }
 
-    virtual string old_generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
+    virtual string generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());

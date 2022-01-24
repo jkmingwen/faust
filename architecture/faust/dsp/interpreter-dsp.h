@@ -33,10 +33,12 @@
 #include <vector>
 
 #include "faust/dsp/dsp.h"
+#include "faust/dsp/libfaust-signal.h"
+#include "faust/dsp/libfaust-box.h"
 #include "faust/gui/meta.h"
 
 /*!
- \addtogroup interpretercpp C++ interface for compiling Faust code. Note that the API is not thread safe.
+ \addtogroup interpretercpp C++ interface for compiling Faust code with the Interpreter backend. Note that the API is not thread safe: use 'startMTDSPFactories/stopMTDSPFactories' to use it in a multi-thread context.
  @{
  */
 
@@ -175,6 +177,42 @@ interpreter_dsp_factory* createInterpreterDSPFactoryFromString(const std::string
                                                                const std::string& dsp_content,
                                                                int argc, const char* argv[],
                                                                std::string& error_msg);
+
+/**
+ * Create a Faust DSP factory from a vector of output signals.
+ * It has to be used with the signal API defined in libfaust-signal.h.
+ *
+ * @param name_app - the name of the Faust program
+ * @param signals - the vector of output signals
+ * @param argc - the number of parameters in argv array
+ * @param argv - the array of parameters
+ * @param error_msg - the error string to be filled
+ *
+ * @return a DSP factory on success, otherwise a null pointer.
+ */
+interpreter_dsp_factory* createInterpreterDSPFactoryFromSignals(const std::string& name_app,
+                                                                tvec signals,
+                                                                int argc, const char* argv[],
+                                                                std::string& error_msg);
+
+/**
+ * Create a Faust DSP factory from a box expression.
+ * It has to be used with the box API defined in libfaust-box.h.
+ *
+ * @param name_app - the name of the Faust program
+ * @param box - the box expression
+ * @param argc - the number of parameters in argv array
+ * @param argv - the array of parameters
+ * @param error_msg - the error string to be filled
+ * since the maximum value may change with new LLVM versions)
+ *
+ * @return a DSP factory on success, otherwise a null pointer.
+ */
+interpreter_dsp_factory* createInterpreterDSPFactoryFromBoxes(const std::string& name_app,
+                                                              Box box,
+                                                              int argc, const char* argv[],
+                                                              std::string& error_msg);
+
 /**
  * Delete a Faust DSP factory, that is decrements it's reference counter, possibly really deleting the internal pointer.
  * Possibly also delete DSP pointers associated with this factory, if they were not explicitly deleted.
@@ -229,7 +267,7 @@ extern "C" void stopMTDSPFactories();
  * the same (reference counted) factory pointer. You will have to explicitly use deleteInterpreterDSPFactory to properly
  * decrement reference counter when the factory is no more needed.
  *
- * @param bitcode_code - the bitcode string
+ * @param bitcode - the bitcode string
  * @param error_msg - the error string to be filled
  *
  * @return the DSP factory on success, otherwise a null pointer.
@@ -251,7 +289,7 @@ std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory
  * the same (reference counted) factory pointer. You will have to explicitly use deleteInterpreterDSPFactory to properly
  * decrement reference counter when the factory is no more needed.
  *
- * @param bitcode_path - the bitcode file pathname
+ * @param bit_code_path - the bitcode file pathname
  * @param error_msg - the error string to be filled
  *
  * @return the DSP factory on success, otherwise a null pointer.
@@ -262,14 +300,15 @@ interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::str
  * Write a Faust DSP factory into a bitcode file.
  *
  * @param factory - the DSP factory
- * @param bitcode_path - the bitcode file pathname
+ * @param bit_code_path - the bitcode file pathname
  *
+ * @return true if success, false otherwise.
  */
-void writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bit_code_path);
+bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bit_code_path);
 
 /*!
  @}
  */
 
 #endif
-/**************************  END  interpreter-dsp.h **************************/
+/************************** END interpreter-dsp.h **************************/

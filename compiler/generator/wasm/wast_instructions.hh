@@ -33,7 +33,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
    private:
     string type2String(Typed::VarType type)
     {
-        if (isIntOrPtrType(type)) {
+        if (isIntOrPtrType(type) || isBoolType(type)) {
             return "i32";
         } else if (type == Typed::kFloat) {
             return "f32";
@@ -96,6 +96,12 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
 
     virtual ~WASTInstVisitor() {}
 
+    virtual void visit(AddSoundfileInst* inst)
+    {
+        // Not supported for now
+        throw faustexception("ERROR : 'soundfile' primitive not yet supported for wast\n");
+    }
+    
     virtual void visit(DeclareVarInst* inst)
     {
         Address::AccessType access      = inst->fAddress->getAccess();
@@ -145,11 +151,10 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
 
     virtual void generateFunDefArgs(DeclareFunInst* inst)
     {
-        list<NamedTyped*>::const_iterator it;
-        size_t                            size = inst->fType->fArgsTypes.size(), i = 0;
-        for (it = inst->fType->fArgsTypes.begin(); it != inst->fType->fArgsTypes.end(); it++, i++) {
-            *fOut << "(param $" << (*it)->fName << " " << type2String((*it)->getType()) << ")";
-            if (i < size - 1) *fOut << " ";
+        size_t size = inst->fType->fArgsTypes.size(), i = 0;
+        for (const auto& it : inst->fType->fArgsTypes) {
+            *fOut << "(param $" << it->fName << " " << type2String(it->getType()) << ")";
+            if (i++ < size - 1) *fOut << " ";
         }
         if (inst->fType->getType() != Typed::kVoid) {
             *fOut << " (result " << type2String(inst->getResType()) << ")";
@@ -228,15 +233,23 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
             if ((offset = getConstantOffset(inst->fAddress)) > 0) {
                 if (isRealType(type)) {
                     *fOut << "(" << realStr << ".load offset=";
-                } else {
+                } else if (isInt64Type(type)) {
+                    *fOut << "(i64.load offset=";
+                } else if (isInt32Type(type) || isPtrType(type)) {
                     *fOut << "(i32.load offset=";
+                } else {
+                    faustassert(false);
                 }
                 *fOut << offset << " (i32.const 0))";
             } else {
                 if (isRealType(type)) {
                     *fOut << "(" << realStr << ".load ";
-                } else {
+                } else if (isInt64Type(type)) {
+                    *fOut << "(i64.load ";
+                } else if (isInt32Type(type) || isPtrType(type)) {
                     *fOut << "(i32.load ";
+                } else {
+                    faustassert(false);
                 }
                 inst->fAddress->accept(this);
                 *fOut << ")";
@@ -268,15 +281,19 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         inst->fValue->accept(&fTypingVisitor);
         Typed::VarType      type   = fTypingVisitor.fCurType;
         Address::AccessType access = inst->fAddress->getAccess();
-
+  
         if (access & Address::kStruct || access & Address::kStaticStruct ||
             dynamic_cast<IndexedAddress*>(inst->fAddress)) {
             int offset;
             if ((offset = getConstantOffset(inst->fAddress)) > 0) {
                 if (isRealType(type) || isRealPtrType(type)) {
                     *fOut << "(" << realStr << ".store offset=";
-                } else {
+                } else if (isInt64Type(type)) {
+                    *fOut << "(i64.store offset=";
+                } else if (isInt32Type(type) || isPtrType(type) || isBoolType(type)) {
                     *fOut << "(i32.store offset=";
+                } else {
+                    faustassert(false);
                 }
                 *fOut << offset << " (i32.const 0) ";
                 inst->fValue->accept(this);
@@ -284,8 +301,12 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
             } else {
                 if (isRealType(type) || isRealPtrType(type)) {
                     *fOut << "(" << realStr << ".store ";
-                } else {
+                } else if (isInt64Type(type)) {
+                    *fOut << "(i64.store ";
+                } else if (isInt32Type(type) || isPtrType(type) || isBoolType(type)) {
                     *fOut << "(i32.store ";
+                } else {
+                    faustassert(false);
                 }
                 inst->fAddress->accept(this);
                 *fOut << " ";
@@ -436,16 +457,16 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
     virtual void visit(Int64NumInst* inst)
     {
         fTypingVisitor.visit(inst);
-        *fOut << "(i64.const 0x" << hex << inst->fNum << ")";
+        *fOut << "(i64.const " << inst->fNum << ")";
     }
 
     // Numerical computation
     void visitAuxInt(BinopInst* inst, Typed::VarType type)
     {
         *fOut << "(";
-        if (type == Typed::kInt32 || type == Typed::kBool) {
+        if (isInt32Type(type) || isBoolType(type)) {
             *fOut << gBinOpTable[inst->fOpcode]->fNameWastInt32;
-        } else if (type == Typed::kInt64) {
+        } else if (isInt64Type(type)) {
             *fOut << gBinOpTable[inst->fOpcode]->fNameWastInt64;
         } else {
             faustassert(false);
@@ -460,9 +481,9 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
     void visitAuxReal(BinopInst* inst, Typed::VarType type)
     {
         *fOut << "(";
-        if (type == Typed::kFloat) {
+        if (isFloatType(type)) {
             *fOut << gBinOpTable[inst->fOpcode]->fNameWastFloat;
-        } else if (type == Typed::kDouble) {
+        } else if (isDoubleType(type)) {
             *fOut << gBinOpTable[inst->fOpcode]->fNameWastDouble;
         } else {
             faustassert(false);
@@ -489,7 +510,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
                 visitAuxReal(inst, type2);
             } else if (isIntType(type1) || isIntType(type2)) {
                 visitAuxInt(inst, type2);
-            } else if (type1 == Typed::kBool && type2 == Typed::kBool) {
+            } else if (isBoolType(type1) && isBoolType(type2)) {
                 visitAuxInt(inst, type1);
             } else {
                 // Should never happen...
@@ -504,25 +525,48 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
     {
         inst->fInst->accept(&fTypingVisitor);
         Typed::VarType type = fTypingVisitor.fCurType;
-
-        if (inst->fType->getType() == Typed::kInt32) {
-            if (type == Typed::kInt32) {
-                // std::cout << "CastInst : cast to int, but arg already int !" << std::endl;
-                inst->fInst->accept(this);
-            } else {
-                *fOut << "(i32.trunc_" << realStr << "_s ";
-                inst->fInst->accept(this);
-                *fOut << ")";
-            }
-        } else {
-            if (isRealType(type)) {
-                // std::cout << "CastInst : cast to real, but arg already real !" << std::endl;
-                inst->fInst->accept(this);
-            } else {
-                *fOut << "(" << realStr << ".convert_i32_s ";
-                inst->fInst->accept(this);
-                *fOut << ")";
-            }
+     
+        switch (inst->fType->getType()) {
+            case Typed::kInt32:
+                if (isInt32Type(type)) {
+                    // std::cout << "CastInst : cast to int, but arg already int !" << std::endl;
+                    inst->fInst->accept(this);
+                } else if (isInt64Type(type)) {
+                    *fOut << "(i32.wrap_i64 ";
+                    inst->fInst->accept(this);
+                    *fOut << ")";
+                } else {
+                    *fOut << "(i32.trunc_" << realStr << "_s ";
+                    inst->fInst->accept(this);
+                    *fOut << ")";
+                }
+                break;
+            
+             case Typed::kInt64:
+                faustassert(false);
+                break;
+                
+            case Typed::kFloat:
+            case Typed::kDouble:
+                if (isRealType(type)) {
+                    // std::cout << "CastInst : cast to real, but arg already real !" << std::endl;
+                    inst->fInst->accept(this);
+                } else if (isInt64Type(type)) {
+                    *fOut << "(" << realStr << ".convert_i64_s ";
+                    inst->fInst->accept(this);
+                    *fOut << ")";
+                } else if (isInt32Type(type) || isBoolType(type)) {
+                    *fOut << "(" << realStr << ".convert_i32_s ";
+                    inst->fInst->accept(this);
+                    *fOut << ")";
+                } else {
+                    faustassert(false);
+                }
+                break;
+                
+            default:
+                faustassert(false);
+                break;
         }
 
         fTypingVisitor.visit(inst);
@@ -607,7 +651,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         // Condition is last item
         inst->fCond->accept(&fTypingVisitor);
         // Possibly convert i64 to i32
-        if (isIntType64(fTypingVisitor.fCurType)) {
+        if (isInt64Type(fTypingVisitor.fCurType)) {
             // Compare to 0
             *fOut << "(i64.ne ";
             inst->fCond->accept(this);
@@ -632,7 +676,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         // Compile 'cond'
         inst->fCond->accept(&fTypingVisitor);
         // Possibly convert i64 to i32
-        if (isIntType64(fTypingVisitor.fCurType)) {
+        if (isInt64Type(fTypingVisitor.fCurType)) {
             // Compare to 0
             *fOut << "(i64.ne ";
             inst->fCond->accept(this);
@@ -650,14 +694,14 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         
         fTypingVisitor.visit(inst);
     }
-
+ 
     // Conditional : if
     virtual void visit(IfInst* inst)
     {
         *fOut << "(if ";
         inst->fCond->accept(&fTypingVisitor);
         // Possibly convert i64 to i32
-        if (isIntType64(fTypingVisitor.fCurType)) {
+        if (isInt64Type(fTypingVisitor.fCurType)) {
             // Compare to 0
             *fOut << "(i64.ne ";
             inst->fCond->accept(this);
@@ -667,14 +711,19 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         }
         fTab++;
         tab(fTab, *fOut);
+        *fOut << "(block ";
         inst->fThen->accept(this);
+        *fOut << ")";
         if (inst->fElse->fCode.size() > 0) {
             tab(fTab, *fOut);
+            *fOut << "(block ";
             inst->fElse->accept(this);
+            *fOut << ")";
         }
         fTab--;
         tab(fTab, *fOut);
         *fOut << ")";
+        tab(fTab, *fOut);
 
         fTypingVisitor.visit(inst);
     }

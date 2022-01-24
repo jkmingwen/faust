@@ -64,7 +64,7 @@ struct TableSizeCloneVisitor : public BasicCloneVisitor {
             LoadVarInst* table = dynamic_cast<LoadVarInst*>(*it);
             faustassert(table);
             list<ValueInst*> cloned_args;
-            for (auto& it1 : inst->fArgs) {
+            for (const auto& it1 : inst->fArgs) {
                 cloned_args.push_back(it1->clone(this));
             }
             return new FunCallInst(inst->fName + "_" + to_string(size->fNum), cloned_args, inst->fMethod);
@@ -73,12 +73,12 @@ struct TableSizeCloneVisitor : public BasicCloneVisitor {
         }
     }
 
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
 class SOULCodeContainer : public virtual CodeContainer {
    protected:
     SOULInstVisitor fCodeProducer;
+    SOULInstUIVisitor fUIVisitor;
     std::ostream*   fOut;
 
     void produceInit(int tabs);
@@ -94,8 +94,13 @@ class SOULCodeContainer : public virtual CodeContainer {
         if (!gGlobal->gTableSizeVisitor) {
             gGlobal->gTableSizeVisitor = new TableSizeVisitor();
         }
+    
+        // Control is separated in the 'control()' function and iControl/fControl arrays
+        // are used to compute control related state to be used in 'run'
+        gGlobal->setVarType("iControl", Typed::kInt32_ptr);
+        gGlobal->setVarType("fControl", Typed::kFloatMacro_ptr);
     }
-
+   
     CodeContainer* createScalarContainer(const string& name, int sub_container_type);
     void           produceInternal();
     void           produceClass();

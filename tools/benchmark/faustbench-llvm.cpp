@@ -1,7 +1,7 @@
 
 /************************************************************************
  FAUST Architecture File
- Copyright (C) 2003-2011 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2003-2020 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This Architecture section is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public License
@@ -23,22 +23,33 @@
  
  ************************************************************************/
 
+#include <iostream>
+
 #include "faust/dsp/dsp-optimizer.h"
 #include "faust/misc.h"
 
 using namespace std;
 
-#define BUFFER_SIZE 512
-
 template <typename REAL>
-static void bench(dsp_optimizer<REAL> optimizer, const string& name, bool trace)
+static void bench(dsp_optimizer_real<REAL> optimizer, const string& in_filename, bool is_trace)
 {
     pair<double, vector<string> > res = optimizer.findOptimizedParameters();
-    if (trace) cout << "Best value for '" << name << "' is : " << res.first << " with ";
-    for (int i = 0; i < res.second.size(); i++) {
+    if (is_trace) cout << "Best value for '" << in_filename << "' is : " << res.first << " MBytes/sec with ";
+    for (size_t i = 0; i < res.second.size(); i++) {
         cout << res.second[i] << " ";
     }
     cout << endl;
+}
+
+template <typename REAL>
+static void bench_single(const string& in_filename, dsp* DSP, int buffer_size, int run, bool is_control, bool is_trace)
+{
+    measure_dsp_real<REAL> mes(DSP, buffer_size, 5., true, is_control);  // Buffer_size and duration in sec of measure
+    for (int i = 0; i < run; i++) {
+        mes.measure();
+        if (is_trace) cout << in_filename << " : " << mes.getStats() << " MBytes/sec (DSP CPU % : " << (mes.getCPULoad() * 100) << " at 44100 Hz)" << endl;
+        FAUSTBENCH_LOG<REAL>(mes.getStats());
+    }
 }
 
 static void splitTarget(const string& target, string& triple, string& cpu)
@@ -53,23 +64,33 @@ static void splitTarget(const string& target, string& triple, string& cpu)
 int main(int argc, char* argv[])
 {
     if (argc == 1 || isopt(argv, "-h") || isopt(argv, "-help")) {
-        cout << "faustbench-llvm [-notrace] [-generic] [-single] [-run <num>] [-opt <level (0..4|-1)>] [additional Faust options (-vec -vs 8...)] foo.dsp" << endl;
+        cout << "faustbench-llvm [-notrace] [-control] [-generic] [-single] [-run <num>] [-bs <frames>] [-opt <level (0..4|-1)>] [-us <factor>] [-ds <factor>] [-filter <filter(0..4)>] [additional Faust options (-vec -vs 8...)] foo.dsp" << endl;
         cout << "Use '-notrace' to only generate the best compilation parameters\n";
+        cout << "Use '-control' to update all controllers with random values at each cycle\n";
         cout << "Use '-generic' to compile for a generic processor, otherwise the native CPU will be used\n";
-        cout << "Use '-single' to execute only scalar test\n";
+        cout << "Use '-single' to execute only one test (scalar by default)\n";
         cout << "Use '-run <num>' to execute each test <num> times\n";
-        cout << "Use '-opt <level (0..4|-1)>' to pass an optimisation level to LLVM\n";
+        cout << "Use '-bs <frames>' to set the buffer-size in frames\n";
+        cout << "Use '-opt <level (0..4|-1)>' to pass an optimisation level to LLVM, between 0 and 4 (-1 means 'maximal level' if range changes in the future)\n";
+        cout << "Use '-us <factor>' to upsample the DSP by a factor\n";
+        cout << "Use '-ds <factor>' to downsample the DSP by a factor\n";
+        cout << "Use '-filter <filter>' for upsampling or downsampling [0..4]\n";
         return 0;
     }
     
     bool is_double = isopt(argv, "-double");
     bool is_trace = !isopt(argv, "-notrace");
+    bool is_control = isopt(argv, "-control");
     bool is_single = isopt(argv, "-single");
     bool is_generic = isopt(argv, "-generic");
     int run = lopt(argv, "-run", 1);
+    int buffer_size = lopt(argv, "-bs", 512);
     int opt = lopt(argv, "-opt", -1);
+    int ds = lopt(argv, "-ds", 0);
+    int us = lopt(argv, "-us", 0);
+    int filter = lopt(argv, "-filter", 0);
     
-    if (is_trace) cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    if (is_trace) cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     // Possibly activate 'generic' generation mode
     string target;
@@ -85,13 +106,20 @@ int main(int argc, char* argv[])
     int argc1 = 0;
     const char* argv1[64];
     
-    if (is_trace) cout << "Running with 'compute' called with " << BUFFER_SIZE << " samples" << endl;
+    if (is_trace) cout << "Running with 'compute' called with " << buffer_size << " samples" << endl;
     
     if (is_trace) cout << "Compiled with additional options : ";
     for (int i = 1; i < argc-1; i++) {
-        if (string(argv[i]) == "-single" || string(argv[i]) == "-generic") {
+        if (string(argv[i]) == "-single"
+            || string(argv[i]) == "-generic"
+            || string(argv[i]) == "-control") {
             continue;
-        } else if (string(argv[i]) == "-run" || string(argv[i]) == "-opt" ) {
+        } else if (string(argv[i]) == "-run"
+                   || string(argv[i]) == "-opt"
+                   || string(argv[i]) == "-bs"
+                   || string(argv[i]) == "-ds"
+                   || string(argv[i]) == "-us"
+                   || string(argv[i]) == "-filter") {
             i++;
             continue;
         }
@@ -112,8 +140,7 @@ int main(int argc, char* argv[])
     try {
         if (is_single) {
             string error_msg;
-            
-            dsp_factory* factory = createDSPFactoryFromFile(in_filename, argc1, argv1, "", error_msg, opt);
+            dsp_factory* factory = createDSPFactoryFromFile(in_filename, argc1, argv1, target, error_msg, opt);
             if (!factory) {
                 cerr << error_msg;
                 exit(EXIT_FAILURE);
@@ -126,26 +153,32 @@ int main(int argc, char* argv[])
             }
             
             if (is_double) {
-                measure_dsp_aux<double> mes(DSP, BUFFER_SIZE, 5.);  // Buffer_size and duration in sec of measure
-                for (int i = 0; i < run; i++) {
-                    mes.measure();
-                    if (is_trace) cout << in_filename << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
-                    FAUSTBENCH_LOG<double>(mes.getStats());
-                }
+                bench_single<double>(in_filename, DSP, buffer_size, run, is_control, is_trace);
             } else {
-                measure_dsp_aux<float> mes(DSP, BUFFER_SIZE, 5.);  // Buffer_size and duration in sec of measure
-                for (int i = 0; i < run; i++) {
-                    mes.measure();
-                    if (is_trace) cout << in_filename << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
-                    FAUSTBENCH_LOG<double>(mes.getStats());
-                }
+                bench_single<float>(in_filename, DSP, buffer_size, run, is_control, is_trace);
             }
             
         } else {
             if (is_double) {
-                bench(dsp_optimizer<double>(in_filename.c_str(), argc1, argv1, target, BUFFER_SIZE, run, -1, is_trace), in_filename, is_trace);
+                bench(dsp_optimizer_real<double>(in_filename.c_str(),
+                                                argc1, argv1,
+                                                target, buffer_size,
+                                                run, -1,
+                                                is_trace,
+                                                is_control,
+                                                ds, us, filter),
+                                                in_filename,
+                                                is_trace);
             } else {
-                bench(dsp_optimizer<float>(in_filename.c_str(), argc1, argv1, target, BUFFER_SIZE, run, -1, is_trace), in_filename, is_trace);
+                bench(dsp_optimizer_real<float>(in_filename.c_str(),
+                                               argc1, argv1,
+                                               target, buffer_size,
+                                               run, -1,
+                                               is_trace,
+                                               is_control,
+                                               ds, us, filter),
+                                               in_filename,
+                                               is_trace);
             }
         }
     } catch (...) {

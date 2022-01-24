@@ -19,9 +19,11 @@
 
 #include <cmath>
 #include <cstring>
+#include <string.h>
+#include <stdio.h>
 
 #include "faust/misc.h"
-#include "faust/gui/UI.h"
+#include "faust/gui/DecoratorUI.h"
 #include "faust/gui/JSONUIDecoder.h"
 #include "faust/dsp/dsp.h"
 #include "faust/dsp/dsp-adapter.h"
@@ -101,6 +103,8 @@
     #include "faust/audio/dummy-audio.h"
 #elif TEENSY_DRIVER
     #include "faust/audio/teensy-dsp.h"
+#elif ESP32_DRIVER
+    #include "faust/audio/esp32-dsp.h"
 #endif
 
 //**************************************************************
@@ -114,6 +118,8 @@
     #include "faust/midi/juce-midi.h"
 #elif TEENSY_DRIVER
     #include "faust/midi/teensy-midi.h"
+#elif ESP32_DRIVER
+    #include "faust/midi/esp32-midi.h"
 #else
     #include "faust/midi/rt-midi.h"
     #include "faust/midi/RtMidi.cpp"
@@ -141,9 +147,19 @@ static void osc_compute_callback(void* arg)
 std::list<GUI*> GUI::fGuiList;
 ztimedmap GUI::gTimedZoneMap;
 
+static bool hasCompileOption(char* options, const char* option)
+{
+    char* token;
+    const char* sep = " ";
+    for (token = strtok(options, sep); token; token = strtok(nullptr, sep)) {
+        if (strcmp(token, option) == 0) return true;
+    }
+    return false;
+}
+
 DspFaust::DspFaust(bool auto_connect)
 {
-    audio* driver = NULL;
+    audio* driver = nullptr;
 #if JACK_DRIVER
     // JACK has its own sample rate and buffer size
 #if MIDICTRL
@@ -154,16 +170,18 @@ DspFaust::DspFaust(bool auto_connect)
 #elif JUCE_DRIVER
     // JUCE audio device has its own sample rate and buffer size
     driver = new juceaudio();
+#elif ANDROID_DRIVER
+    driver = new oboeaudio(-1);
 #else
-    std::cerr << "You are not setting 'sample_rate' and 'buffer_size', but the audio driver needs it !\n";
+    printf("You are not setting 'sample_rate' and 'buffer_size', but the audio driver needs it !\n");
     throw std::bad_alloc();
 #endif
-    init(NULL, driver);
+    init(new mydsp(), driver);
 }
 
 DspFaust::DspFaust(int sample_rate, int buffer_size, bool auto_connect)
 {
-    init(NULL, createDriver(sample_rate, buffer_size, auto_connect));
+    init(new mydsp(), createDriver(sample_rate, buffer_size, auto_connect));
 }
 
 #if DYNAMIC_DSP
@@ -172,20 +190,20 @@ DspFaust::DspFaust(const string& dsp_content, int sample_rate, int buffer_size, 
     string error_msg;
 
     // Is dsp_content a filename ?
-    fFactory = createDSPFactoryFromFile(dsp_content, 0, NULL, "", error_msg, -1);
+    fFactory = createDSPFactoryFromFile(dsp_content, 0, nullptr, "", error_msg, -1);
     if (!fFactory) {
-        std::cerr << error_msg;
+        fprintf(stderr, "ERROR : %s", error_msg.c_str());
         // Is dsp_content a string ?
-        fFactory = createDSPFactoryFromString("FaustDSP", dsp_content, 0, NULL, "", error_msg);
+        fFactory = createDSPFactoryFromString("FaustDSP", dsp_content, 0, nullptr, "", error_msg);
         if (!fFactory) {
-            std::cerr << error_msg;
+            fprintf(stderr, "ERROR : %s", error_msg.c_str());
             throw bad_alloc();
         }
     }
 
     dsp* dsp = fFactory->createDSPInstance();
     if (!dsp) {
-        std::cerr << "Cannot allocate DSP instance\n";
+        fprintf(stderr, "Cannot allocate DSP instance\n");
         throw bad_alloc();
     }
     init(dsp, createDriver(sample_rate, buffer_size, auto_connect));
@@ -200,13 +218,13 @@ audio* DspFaust::createDriver(int sample_rate, int buffer_size, bool auto_connec
     audio* driver = new iosaudio(sample_rate, buffer_size);
 #elif ANDROID_DRIVER
     // OBOE has its own and buffer size
-    std::cerr << "You are setting 'buffer_size' with a driver that does not need it !\n";
+    fprintf(stderr, "You are setting 'buffer_size' with a driver that does not need it !\n");
     audio* driver = new oboeaudio(-1);
 #elif ALSA_DRIVER
     audio* driver = new alsaaudio(sample_rate, buffer_size);
 #elif JACK_DRIVER
     // JACK has its own sample rate and buffer size
-    std::cerr << "You are setting 'sample_rate' and 'buffer_size' with a driver that does not need it !\n";
+    fprintf(stderr, "You are setting 'sample_rate' and 'buffer_size' with a driver that does not need it !\n");
 #if MIDICTRL
     audio* driver = new jackaudio_midi(auto_connect);
 #else
@@ -220,14 +238,14 @@ audio* DspFaust::createDriver(int sample_rate, int buffer_size, bool auto_connec
     audio* driver = new ofaudio(sample_rate, buffer_size);
 #elif JUCE_DRIVER
     // JUCE audio device has its own sample rate and buffer size
-    std::cerr << "You are setting 'sample_rate' and 'buffer_size' with a driver that does not need it !\n";
+    fprintf(stderr, "You are setting 'sample_rate' and 'buffer_size' with a driver that does not need it !\n");
     audio* driver = new juceaudio();
 #elif DUMMY_DRIVER
     audio* driver = new dummyaudio(sample_rate, buffer_size);
-#elif TEENSY_DRIVER
-    // TEENSY has its own and buffer size
-    std::cerr << "You are setting 'sample_rate' and 'buffer_size' with a driver that does not need it !\n";
-    audio* driver = new teensyaudio();
+#elif ESP32_DRIVER
+    audio* driver = new esp32audio(sample_rate, buffer_size);
+#elif DUMMY_DRIVER
+    audio* driver = new dummyaudio(sample_rate, buffer_size);
 #endif
     return driver;
 }
@@ -235,21 +253,24 @@ audio* DspFaust::createDriver(int sample_rate, int buffer_size, bool auto_connec
 void DspFaust::init(dsp* mono_dsp, audio* driver)
 {
 #if MIDICTRL
-    midi_handler* midi;
+    midi_handler* handler;
 #if JACK_DRIVER
-    midi = static_cast<jackaudio_midi*>(driver);
-    fMidiInterface = new MidiUI(midi);
+    handler = static_cast<jackaudio_midi*>(driver);
+    fMidiInterface = new MidiUI(handler);
 #elif JUCE_DRIVER
-    midi = new juce_midi();
-    fMidiInterface = new MidiUI(midi, true);
+    handler = new juce_midi();
+    fMidiInterface = new MidiUI(handler, true);
 #elif TEENSY_DRIVER
-    midi = new teensy_midi();
-    fMidiInterface = new MidiUI(midi, true);
+    handler = new teensy_midi();
+    fMidiInterface = new MidiUI(handler, true);
+#elif ESP32_DRIVER
+    handler = new esp32_midi();
+    fMidiInterface = new MidiUI(handler, true);
 #else
-    midi = new rt_midi();
-    fMidiInterface = new MidiUI(midi, true);
+    handler = new rt_midi();
+    fMidiInterface = new MidiUI(handler, true);
 #endif
-    fPolyEngine = new FaustPolyEngine(mono_dsp, driver, midi);
+    fPolyEngine = new FaustPolyEngine(mono_dsp, driver, handler);
     fPolyEngine->buildUserInterface(fMidiInterface);
 #else
     fPolyEngine = new FaustPolyEngine(mono_dsp, driver);
@@ -279,20 +300,32 @@ void DspFaust::init(dsp* mono_dsp, audio* driver)
 #endif
     fPolyEngine->buildUserInterface(fOSCInterface);
 #endif
+    
+    // Retrieving DSP object 'compile_options'
+    struct MyMeta : public Meta
+    {
+        string fCompileOptions;
+        void declare(const char* key, const char* value)
+        {
+            if (strcmp(key, "compile_options") == 0) fCompileOptions = value;
+        }
+        MyMeta(){}
+    };
+    
+    MyMeta meta;
+    mono_dsp->metadata(&meta);
+    bool is_double = hasCompileOption((char*)meta.fCompileOptions.c_str(), "-double");
 
 #if SOUNDFILE
 #if JUCE_DRIVER
     auto file = File::getSpecialLocation(File::currentExecutableFile)
         .getParentDirectory().getParentDirectory().getChildFile("Resources");
-    fSoundInterface = new SoundUI(file.getFullPathName().toStdString());
+    fSoundInterface = new SoundUI(file.getFullPathName().toStdString(), -1, nullptr, is_double);
 #else
     // Use bundle path
-    fSoundInterface = new SoundUI(SoundUI::getBinaryPath());
+    fSoundInterface = new SoundUI(SoundUI::getBinaryPath(), -1, nullptr, is_double);
 #endif
-    // SoundUI has to be dispatched on all internal voices
-    fPolyEngine->setGroup(false);
     fPolyEngine->buildUserInterface(fSoundInterface);
-    fPolyEngine->setGroup(true);
 #endif
 }
 
@@ -301,15 +334,15 @@ DspFaust::~DspFaust()
 #if OSCCTRL
     delete fOSCInterface;
 #endif
-#if MIDICTRL
-    delete fMidiInterface;
-#endif
 #if SOUNDFILE
     delete fSoundInterface;
 #endif
     delete fPolyEngine;
 #if DYNAMIC_DSP
     deleteDSPFactory(static_cast<llvm_dsp_factory*>(fFactory));
+#endif
+#if MIDICTRL
+    delete fMidiInterface;  // after deleting fPolyEngine;
 #endif
 }
 
@@ -320,7 +353,7 @@ bool DspFaust::start()
 #endif
 #if MIDICTRL
     if (!fMidiInterface->run()) {
-        std::cerr << "MIDI run error...\n";
+        fprintf(stderr, "MIDI run error...\n");
     }
 #endif
 	return fPolyEngine->start();
@@ -516,32 +549,32 @@ const char* DspFaust::getMetadata(int id, const char* key)
 
 void DspFaust::propagateAcc(int acc, float v)
 {
-	fPolyEngine->propagateAcc(acc, v);
+    fPolyEngine->propagateAcc(acc, v);
 }
 
 void DspFaust::setAccConverter(int p, int acc, int curve, float amin, float amid, float amax)
 {
-	fPolyEngine->setAccConverter(p, acc, curve, amin, amid, amax);
+    fPolyEngine->setAccConverter(p, acc, curve, amin, amid, amax);
 }
 
 void DspFaust::propagateGyr(int acc, float v)
 {
-	fPolyEngine->propagateGyr(acc, v);
+    fPolyEngine->propagateGyr(acc, v);
 }
 
 void DspFaust::setGyrConverter(int p, int gyr, int curve, float amin, float amid, float amax)
 {
-	fPolyEngine->setGyrConverter(p, gyr, curve, amin, amid, amax);
+    fPolyEngine->setGyrConverter(p, gyr, curve, amin, amid, amax);
 }
 
 float DspFaust::getCPULoad()
 {
-	return fPolyEngine->getCPULoad();
+    return fPolyEngine->getCPULoad();
 }
 
 int DspFaust::getScreenColor()
 {
-	return fPolyEngine->getScreenColor();
+    return fPolyEngine->getScreenColor();
 }
 
 #ifdef BUILD
@@ -550,12 +583,16 @@ int DspFaust::getScreenColor()
 int main(int argc, char* argv[])
 {
 #ifdef DYNAMIC_DSP
+    if (argc == 1) {
+        printf("./dynamic-api <foo.dsp> \n");
+        exit(-1);
+    }
     DspFaust* dsp = new DspFaust(argv[1], 44100, 512);
 #else
     DspFaust* dsp = new DspFaust(44100, 512);
 #endif
     dsp->start();
-    std::cout << "Type 'q' to quit\n";
+    printf("Type 'q' to quit\n");
     char c;
     while ((c = getchar()) && (c != 'q')) { usleep(100000); }
     dsp->stop();

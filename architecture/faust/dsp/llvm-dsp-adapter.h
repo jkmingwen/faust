@@ -60,7 +60,7 @@ class mydsp : public dsp {
     private:
         
         comp_llvm_mydsp* fDSP;
-        JSONUITemplatedDecoder* fDecoder;
+        JSONUIDecoderBase* fDecoder;
     
     public:
     
@@ -155,4 +155,4 @@ class mydsp : public dsp {
 dsp* createmydsp() { return new mydsp(); }
 
 #endif
-/**************************  END  llvm-dsp-adapter.h **************************/
+/************************** END llvm-dsp-adapter.h **************************/

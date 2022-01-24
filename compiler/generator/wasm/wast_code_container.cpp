@@ -87,9 +87,6 @@ CodeContainer* WASTCodeContainer::createContainer(const string& name, int numInp
 {
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for WebAssembly\n");
-    }
     if (gGlobal->gFloatSize == 3) {
         throw faustexception("ERROR : quad format not supported for WebAssembly\n");
     }
@@ -159,7 +156,7 @@ void WASTCodeContainer::produceClass()
     // Global declarations (mathematical functions, global variables...)
     gGlobal->gWASTVisitor->Tab(n + 1);
 
-    // Sub containers : before functions generation
+    // Sub containers are merged in the main module, before functions generation
     mergeSubContainers();
 
     // All mathematical functions (got from math library as variables) have to be first
@@ -447,6 +444,9 @@ void WASTScalarCodeContainer::generateCompute(int n)
     // Loop 'i' variable is moved by bytes
     BlockInst* compute_block = InstBuilder::genBlockInst();
     compute_block->pushBackInst(fCurLoop->generateScalarLoop(fFullCount, gGlobal->gLoopVarInBytes));
+    
+    // Generates post DSP loop code
+    compute_block->pushBackInst(fPostComputeBlockInstructions);
 
     generateComputeAux2(compute_block, n);
 }

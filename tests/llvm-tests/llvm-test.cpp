@@ -35,6 +35,12 @@
 
 using namespace std;
 
+// To do CPU native compilation
+#define JIT_TARGET ""
+
+// To do cross-compilation for a given target
+//#define JIT_TARGET "x86_64-apple-darwin20.6.0:westmere"
+
 static void printList(const vector<string>& list)
 {
     for (int i = 0; i < list.size(); i++) {
@@ -42,14 +48,14 @@ static void printList(const vector<string>& list)
     }
 }
 
-struct testUI : public GenericUI {
+struct TestUI : public GenericUI {
     
     FAUSTFLOAT fInit;
     FAUSTFLOAT fMin;
     FAUSTFLOAT fMax;
     FAUSTFLOAT fStep;
     
-    testUI(FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step)
+    TestUI(FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step)
     {
         fInit = init;
         fMin = min;
@@ -84,12 +90,13 @@ int main(int argc, const char** argv)
     string error_msg;
     cout << "Libfaust version : " << getCLibFaustVersion () << endl;
     string dspFile = argv[1];
-    string tempDir = "/private/var/tmp/";
+    
+    std::cout << "getDSPMachineTarget " << getDSPMachineTarget() << std::endl;
    
     cout << "=============================\n";
     cout << "Test createDSPFactoryFromFile\n";
     {
-        dsp_factory* factory = createDSPFactoryFromFile(dspFile, 0, NULL, "", error_msg, -1);
+        dsp_factory* factory = createDSPFactoryFromFile(dspFile, 0, NULL, JIT_TARGET, error_msg, -1);
         
         if (!factory) {
             cerr << "Cannot create factory : " << error_msg;
@@ -128,7 +135,7 @@ int main(int argc, const char** argv)
     cout << "=============================\n";
     cout << "Test createDSPFactoryFromString\n";
     {
-        dsp_factory* factory = createDSPFactoryFromString("score", "process = +;", 0, NULL, "", error_msg, -1);
+        dsp_factory* factory = createDSPFactoryFromString("FaustDSP", "process = +;", 0, NULL, JIT_TARGET, error_msg, -1);
         if (!factory) {
             cerr << "Cannot create factory : " << error_msg;
             exit(EXIT_FAILURE);
@@ -162,7 +169,7 @@ int main(int argc, const char** argv)
     cout << "=============================\n";
     cout << "Test of UI element encoding\n";
     {
-        dsp_factory* factory = createDSPFactoryFromString("score", "process = vslider(\"Volume\", 0.5, 0, 1, 0.025);", 0, NULL, "", error_msg, -1);
+        dsp_factory* factory = createDSPFactoryFromString("FaustDSP", "process = vslider(\"Volume\", 0.5, 0, 1, 0.025);", 0, NULL, JIT_TARGET, error_msg, -1);
         if (!factory) {
             cerr << "Cannot create factory : " << error_msg;
             exit(EXIT_FAILURE);
@@ -174,18 +181,22 @@ int main(int argc, const char** argv)
             exit(EXIT_FAILURE);
         }
 
-        testUI test(0.5, 0, 1, 0.025);
+        TestUI test(0.5, 0, 1, 0.025);
         DSP->buildUserInterface(&test);
+        
+        delete DSP;
+        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
     }
     
     // Test generateAuxFilesFromFile/generateAuxFilesFromString
+    string tempDir = "/private/var/tmp/";
     int argc2 = 0;
     const char* argv2[64];
     argv2[argc2++] = "-svg";
     argv2[argc2++] = "-O";
     argv2[argc2++] = tempDir.c_str();
     argv2[argc2] = nullptr;  // NULL terminated argv
-    
+   
     {
         cout << "=============================\n";
         cout << "Test generateAuxFilesFromFile\n";

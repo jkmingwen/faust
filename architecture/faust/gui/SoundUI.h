@@ -30,10 +30,10 @@
 #include <string>
 #include <iostream>
 
-#include "faust/gui/DecoratorUI.h"
 #include "faust/gui/SimpleParser.h"
+#include "faust/gui/DecoratorUI.h"
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && !defined(__VCVRACK__) && !defined(JUCE_32BIT) && !defined(JUCE_64BIT)
 #include <CoreFoundation/CFBundle.h>
 #endif
 
@@ -42,30 +42,34 @@
 
 #if defined(JUCE_32BIT) || defined(JUCE_64BIT)
 #include "faust/gui/JuceReader.h"
-JuceReader gReader;
+static JuceReader gReader;
 #elif defined(ESP32)
+#include "faust/gui/Esp32Reader.h"
+static Esp32Reader gReader;
+#elif defined(DAISY)
 #include "faust/gui/WaveReader.h"
-WaveReader gReader;
+static WaveReader gReader;
 #elif defined(MEMORY_READER)
 #include "faust/gui/MemoryReader.h"
-MemoryReader gReader;
+static MemoryReader gReader;
 #else
 #include "faust/gui/LibsndfileReader.h"
-LibsndfileReader gReader;
+static LibsndfileReader gReader;
 #endif
 
 // To be used by DSP code if no SoundUI is used
-std::vector<std::string> path_name_list;
-Soundfile* defaultsound = gReader.createSoundfile(path_name_list, MAX_CHAN);
+static std::vector<std::string> path_name_list;
+static Soundfile* defaultsound = nullptr;
 
-class SoundUI : public GenericUI
+class SoundUI : public SoundUIInterface
 {
 		
-    private:
+    protected:
     
         std::vector<std::string> fSoundfileDir;             // The soundfile directories
         std::map<std::string, Soundfile*> fSoundfileMap;    // Map to share loaded soundfiles
         SoundfileReader* fSoundReader;
+        bool fIsDouble;
 
      public:
     
@@ -75,14 +79,17 @@ class SoundUI : public GenericUI
          * @param sound_directory - the base directory to look for files, which paths will be relative to this one
          * @param sample_rate - the audio driver SR which may be different from the file SR, to possibly resample files
          * @param reader - an alternative soundfile reader
+         * @param is_double - whether Faust code has been compiled in -double mode and soundfile buffers have to be in double
          *
          * @return the soundfile loader.
          */
-        SoundUI(const std::string& sound_directory = "", int sample_rate = -1, SoundfileReader* reader = nullptr)
+        SoundUI(const std::string& sound_directory = "", int sample_rate = -1, SoundfileReader* reader = nullptr, bool is_double = false)
         {
             fSoundfileDir.push_back(sound_directory);
             fSoundReader = (reader) ? reader : &gReader;
             fSoundReader->setSampleRate(sample_rate);
+            fIsDouble = is_double;
+            if (!defaultsound) defaultsound = gReader.createSoundfile(path_name_list, MAX_CHAN, is_double);
         }
     
         /**
@@ -91,22 +98,24 @@ class SoundUI : public GenericUI
          * @param sound_directories - a vector of base directories to look for files, which paths will be relative to these ones
          * @param sample_rate - the audio driver SR which may be different from the file SR, to possibly resample files
          * @param reader - an alternative soundfile reader
+         * @param is_double - whether Faust code has been compiled in -double mode and soundfile buffers have to be in double
          *
          * @return the soundfile loader.
          */
-        SoundUI(const std::vector<std::string>& sound_directories, int sample_rate = -1, SoundfileReader* reader = nullptr)
+        SoundUI(const std::vector<std::string>& sound_directories, int sample_rate = -1, SoundfileReader* reader = nullptr, bool is_double = false)
         :fSoundfileDir(sound_directories)
         {
             fSoundReader = (reader) ? reader : &gReader;
             fSoundReader->setSampleRate(sample_rate);
+            fIsDouble = is_double;
+            if (!defaultsound) defaultsound = gReader.createSoundfile(path_name_list, MAX_CHAN, is_double);
         }
     
         virtual ~SoundUI()
         {   
             // Delete all soundfiles
-            std::map<std::string, Soundfile*>::iterator it;
-            for (it = fSoundfileMap.begin(); it != fSoundfileMap.end(); it++) {
-                delete (*it).second;
+            for (const auto& it : fSoundfileMap) {
+                delete it.second;
             }
         }
 
@@ -121,13 +130,14 @@ class SoundUI : public GenericUI
             if (!menu) { file_name_list.push_back(saved_url); }
             
             // Parse the possible list
-            if (fSoundfileMap.find(saved_url) == fSoundfileMap.end()) {
+            std::string saved_url_real = std::string(saved_url) + "_" + std::to_string(fIsDouble); // fIsDouble is used in the key
+            if (fSoundfileMap.find(saved_url_real) == fSoundfileMap.end()) {
                 // Check all files and get their complete path
                 std::vector<std::string> path_name_list = fSoundReader->checkFiles(fSoundfileDir, file_name_list);
                 // Read them and create the Soundfile
-                Soundfile* sound_file = fSoundReader->createSoundfile(path_name_list, MAX_CHAN);
+                Soundfile* sound_file = fSoundReader->createSoundfile(path_name_list, MAX_CHAN, fIsDouble);
                 if (sound_file) {
-                    fSoundfileMap[saved_url] = sound_file;
+                    fSoundfileMap[saved_url_real] = sound_file;
                 } else {
                     // If failure, use 'defaultsound'
                     std::cerr << "addSoundfile : soundfile for " << saved_url << " cannot be created !" << std::endl;
@@ -137,7 +147,7 @@ class SoundUI : public GenericUI
             }
             
             // Get the soundfile
-            *sf_zone = fSoundfileMap[saved_url];
+            *sf_zone = fSoundfileMap[saved_url_real];
         }
     
         /**
@@ -149,7 +159,7 @@ class SoundUI : public GenericUI
         static std::string getBinaryPath()
         {
             std::string bundle_path_str;
-        #ifdef __APPLE__
+        #if defined(__APPLE__) && !defined(__VCVRACK__) && !defined(JUCE_32BIT) && !defined(JUCE_64BIT)
             CFURLRef bundle_ref = CFBundleCopyBundleURL(CFBundleGetMainBundle());
             if (!bundle_ref) { std::cerr << "getBinaryPath CFBundleCopyBundleURL error\n"; return ""; }
       
@@ -177,7 +187,7 @@ class SoundUI : public GenericUI
         static std::string getBinaryPathFrom(const std::string& path)
         {
             std::string bundle_path_str;
-        #ifdef __APPLE__
+        #if defined(__APPLE__) && !defined(__VCVRACK__) && !defined(JUCE_32BIT) && !defined(JUCE_64BIT)
             CFBundleRef bundle = CFBundleGetBundleWithIdentifier(CFStringCreateWithCString(kCFAllocatorDefault, path.c_str(), CFStringGetSystemEncoding()));
             if (!bundle) { std::cerr << "getBinaryPathFrom CFBundleGetBundleWithIdentifier error '" << path << "'" << std::endl; return ""; }
          

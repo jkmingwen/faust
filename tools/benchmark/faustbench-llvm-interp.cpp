@@ -22,6 +22,8 @@
  
  ************************************************************************/
 
+#include <iostream>
+
 #include "faust/dsp/dsp-bench.h"
 #include "faust/misc.h"
 #include "faust/dsp/llvm-dsp.h"
@@ -36,7 +38,7 @@ int main(int argc, char* argv[])
         return 0;
     }
     
-    cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     string error_msg1;
     string error_msg2;

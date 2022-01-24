@@ -3,7 +3,7 @@
 #####################################################################
 #                                                                   #
 #    Generates an API for Android or iOS based on a Faust object    #
-#               (c) Romain Michon CCRMA and Grame, 2016-2020        #
+#               (c) Romain Michon CCRMA and Grame, 2016-2021        #
 #                                                                   #
 #####################################################################
 
@@ -11,7 +11,7 @@
 . faustoptflags
 . usage.sh
 
-CXXFLAGS=$MYGCCFLAGS
+CXXFLAGS+=" $MYGCCFLAGS"  # So that additional CXXFLAGS can be used
 
 # change if you want to get the log of what's happening
 LOG="/dev/null"
@@ -49,6 +49,13 @@ OPEN_FRAMEWORK_DRIVER="0"
 JUCE_DRIVER="0"
 DUMMY_DRIVER="0"
 TEENSY_DRIVER="0"
+ESP32_DRIVER="0"
+
+if [[ $(uname -s) == Darwin ]]; then
+	ARCHLIB+=" -framework CoreMIDI -framework CoreFoundation -framework CoreAudio -framework AudioUnit -framework CoreServices"
+else
+	ARCHLIB=""
+fi
 
 echoHelp ()
 {
@@ -71,6 +78,7 @@ echoHelp ()
     option -juce "generates a JUCE API"
     option -dummy "generates a dummy audio API" 
     option -teensy "generates a Teensy API" 
+    option -esp32 "generates a ESP32 API" 
     echo 
     echo "Global options:"
     option "-opt native|generic" "activates the best compilation options for the native or generic CPU."
@@ -137,7 +145,7 @@ do
         OPT=$1
     elif [ "$PACKAGENAME" = "-1" ]; then
 		PACKAGENAME="$p"
-    elif [[ -f "$p" ]]; then
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 		FILE="$p"
     elif [ $p = "-android" ]; then
 		ANDROID_DRIVER=1
@@ -161,6 +169,9 @@ do
         DUMMY_DRIVER=1
     elif [ $p = "-teensy" ]; then
         TEENSY_DRIVER=1
+        MISC_OPT="-uim"
+    elif [ $p = "-esp32" ]; then
+        ESP32_DRIVER=1
         MISC_OPT="-uim"
     elif [ "$p" = "-effect" ]; then
         POLY2="1"
@@ -311,6 +322,10 @@ elif [ $TEENSY_DRIVER -eq 1 ]; then
     echo "Your $APILOCATION API package for teensy audio is being created"
     createAPI
     echo "#define TEENSY_DRIVER 1" | cat - "$APIFOLDER/DspFaust.cpp" > temp && mv temp "$APIFOLDER/DspFaust.cpp"
+elif [ $ESP32_DRIVER -eq 1 ]; then
+    echo "Your $APILOCATION API package for ESP32 audio is being created"
+    createAPI
+    echo "#define ESP32_DRIVER 1" | cat - "$APIFOLDER/DspFaust.cpp" > temp && mv temp "$APIFOLDER/DspFaust.cpp"
 else
     echoHelp
     exit 1
@@ -323,18 +338,17 @@ fi
 if [ "$BUILD" = "1" ]; then
 
     if [ "$DYNAMIC_DSP" = "1" ]; then
-        echo "Compile as a binary named 'dynamic-api' "
+        echo "Compile as a binary named 'dynamic-api'"
         # compile c++ to binary liked with lbfaust/LLSM
         (
-            $CXX $CXXFLAGS $APIFOLDER/DspFaust.cpp /usr/local/lib/libfaust.a -lz -lncurses -lOSCFaust `llvm-config --ldflags --libs all --system-libs`  `pkg-config --cflags --static --libs jack sndfile` -o dynamic-api
+            $CXX $CXXFLAGS $APIFOLDER/DspFaust.cpp /usr/local/lib/libfaust.a -lz -lncurses -lOSCFaust $ARCHLIB `llvm-config --ldflags --libs all --system-libs`  `pkg-config --cflags --static --libs jack sndfile` -o dynamic-api
         ) > /dev/null || exit 1
         exit 0
    else
         echo "Compile the ${FILE%.dsp} binary"
         # compile c++ to binary
         (
-            #$CXX $CXXFLAGS $APIFOLDER/DspFaust.cpp -lOSCFaust `pkg-config --cflags --static --libs jack sndfile` -o ${FILE%.dsp}
-            $CXX $CXXFLAGS $APIFOLDER/DspFaust.cpp -lOSCFaust `pkg-config --cflags --static --libs jack` -o ${FILE%.dsp}
+            $CXX $CXXFLAGS $APIFOLDER/DspFaust.cpp -lOSCFaust $ARCHLIB `pkg-config --cflags --static --libs jack` -o ${FILE%.dsp}
         ) > /dev/null || exit 1
         exit 0
     fi
@@ -375,7 +389,11 @@ if [ $NODOC -eq 0 ]; then
 
 	# compile c++ to binary
 	(
-		$CXX $CXXFLAGS "$PPFILE" `pkg-config --cflags --static --libs sndfile` -lpthread -o "$PPBINARY"
+		if [ "$NVOICES" -gt "0" ]; then
+		    $CXX $CXXFLAGS -DPOLY_VOICES "$PPFILE" `pkg-config --cflags --static --libs sndfile` -lpthread -o "$PPBINARY"
+		else
+		    $CXX $CXXFLAGS "$PPFILE" `pkg-config --cflags --static --libs sndfile` -lpthread -o "$PPBINARY"
+		fi
 	) > /dev/null || exit 1
 	rm "$PPFILE" || exit 1
 

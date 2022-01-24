@@ -11,7 +11,7 @@
 . faustoptflags
 . usage.sh
 
-CXXFLAGS=$MYGCCFLAGS
+CXXFLAGS+=" $MYGCCFLAGS"  # So that additional CXXFLAGS can be used
 
 ARCHFILE=$FAUSTARCH/alsa-gtk.cpp
 OSCDEFS=""
@@ -33,7 +33,7 @@ for p in $@; do
         usage faust2alsa "[options] <file.dsp>"
  		platform Linux
 		require Alsa
-		echo "Compiles Faust programs to alsa-gtk"
+		echo "Compiles Faust programs to ALSA and GTK"
 		option
         options -httpd -osc -midi -qrcode -poly
         exit
@@ -55,7 +55,7 @@ for p in $@; do
 	    PROCARCH="-m64"
     elif [ ${p:0:1} = "-" ]; then
 	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
+	elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 	    FILES="$FILES $p"
 	else
 	    OPTIONS="$OPTIONS $p"        

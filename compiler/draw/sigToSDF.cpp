@@ -186,7 +186,7 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
                                                  Actor(actorName.str(), sigLabel(sig))));
             Tree arg1, arg2;
             int arg2_val;
-            if (isSigFixDelay(sig, arg1, arg2)) {
+            if (isSigDelay(sig, arg1, arg2)) {
                 stringstream arg1_name;
                 stringstream arg2_name;
                 arg1_name << arg1;
@@ -353,7 +353,7 @@ static string sigLabel(Tree sig)
 
     else if (isSigDelay1(sig, x)) {
         fout << "mem";
-    } else if (isSigFixDelay(sig, x, y)) {
+    } else if (isSigDelay(sig, x, y)) {
         fout << "delay";
     } else if (isSigPrefix(sig, x, y)) {
         fout << "prefix";
@@ -379,8 +379,6 @@ static string sigLabel(Tree sig)
 
     else if (isSigSelect2(sig, sel, x, y)) {
         fout << "select2";
-    } else if (isSigSelect3(sig, sel, x, y, z)) {
-        fout << "select3";
     }
 
     else if (isSigGen(sig, x)) {

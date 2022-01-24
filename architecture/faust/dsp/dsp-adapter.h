@@ -29,8 +29,9 @@
 #include <alloca.h>
 #endif
 #include <string.h>
-#include <iostream>
 #include <cmath>
+#include <assert.h>
+#include <stdio.h>
 
 #include "faust/dsp/dsp.h"
 
@@ -38,64 +39,68 @@
 class dsp_adapter : public decorator_dsp {
     
     private:
-        
+    
         FAUSTFLOAT** fAdaptedInputs;
         FAUSTFLOAT** fAdaptedOutputs;
-        int fHardwareInputs;
-        int fHardwareOutputs;
-        
+        int fHWInputs;
+        int fHWOutputs;
+        int fBufferSize;
+    
         void adaptBuffers(FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
-            for (int i = 0; i < fHardwareInputs; i++) {
+            for (int i = 0; i < fHWInputs; i++) {
                 fAdaptedInputs[i] = inputs[i];
             }
-            for (int i = 0; i < fHardwareOutputs; i++) {
+            for (int i = 0; i < fHWOutputs; i++) {
                 fAdaptedOutputs[i] = outputs[i];
             }
         }
-        
+    
     public:
-        
-        dsp_adapter(dsp* dsp, int hardware_inputs, int hardware_outputs, int buffer_size):decorator_dsp(dsp)
+    
+        dsp_adapter(dsp* dsp, int hw_inputs, int hw_outputs, int buffer_size):decorator_dsp(dsp)
         {
-            fHardwareInputs = hardware_inputs;
-            fHardwareOutputs = hardware_outputs;
-             
+            fHWInputs = hw_inputs;
+            fHWOutputs = hw_outputs;
+            fBufferSize = buffer_size;
+            
             fAdaptedInputs = new FAUSTFLOAT*[dsp->getNumInputs()];
-            for (int i = 0; i < dsp->getNumInputs() - fHardwareInputs; i++) {
-                fAdaptedInputs[i + fHardwareInputs] = new FAUSTFLOAT[buffer_size];
-                memset(fAdaptedInputs[i + fHardwareInputs], 0, sizeof(FAUSTFLOAT) * buffer_size);
+            for (int i = 0; i < dsp->getNumInputs() - fHWInputs; i++) {
+                fAdaptedInputs[i + fHWInputs] = new FAUSTFLOAT[buffer_size];
+                memset(fAdaptedInputs[i + fHWInputs], 0, sizeof(FAUSTFLOAT) * buffer_size);
             }
             
             fAdaptedOutputs = new FAUSTFLOAT*[dsp->getNumOutputs()];
-            for (int i = 0; i < dsp->getNumOutputs() - fHardwareOutputs; i++) {
-                fAdaptedOutputs[i + fHardwareOutputs] = new FAUSTFLOAT[buffer_size];
-                memset(fAdaptedOutputs[i + fHardwareOutputs], 0, sizeof(FAUSTFLOAT) * buffer_size);
+            for (int i = 0; i < dsp->getNumOutputs() - fHWOutputs; i++) {
+                fAdaptedOutputs[i + fHWOutputs] = new FAUSTFLOAT[buffer_size];
+                memset(fAdaptedOutputs[i + fHWOutputs], 0, sizeof(FAUSTFLOAT) * buffer_size);
             }
         }
-        
+    
         virtual ~dsp_adapter()
         {
-            for (int i = 0; i < fDSP->getNumInputs() - fHardwareInputs; i++) {
-                delete [] fAdaptedInputs[i + fHardwareInputs];
+            for (int i = 0; i < fDSP->getNumInputs() - fHWInputs; i++) {
+                delete [] fAdaptedInputs[i + fHWInputs];
             }
             delete [] fAdaptedInputs;
             
-            for (int i = 0; i < fDSP->getNumOutputs() - fHardwareOutputs; i++) {
-                delete [] fAdaptedOutputs[i + fHardwareOutputs];
+            for (int i = 0; i < fDSP->getNumOutputs() - fHWOutputs; i++) {
+                delete [] fAdaptedOutputs[i + fHWOutputs];
             }
             delete [] fAdaptedOutputs;
         }
     
-        virtual int getNumInputs() { return fHardwareInputs; }
-        virtual int getNumOutputs() { return fHardwareOutputs; }
+        virtual int getNumInputs() { return fHWInputs; }
+        virtual int getNumOutputs() { return fHWOutputs; }
+    
+        virtual dsp_adapter* clone() { return new dsp_adapter(fDSP->clone(), fHWInputs, fHWOutputs, fBufferSize); }
     
         virtual void compute(double date_usec, int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
             adaptBuffers(inputs, outputs);
             fDSP->compute(date_usec, count, fAdaptedInputs, fAdaptedOutputs);
         }
-        
+    
         virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
             adaptBuffers(inputs, outputs);
@@ -107,7 +112,7 @@ class dsp_adapter : public decorator_dsp {
 template <typename REAL_INT, typename REAL_EXT>
 class dsp_sample_adapter : public decorator_dsp {
     
-    protected:
+    private:
     
         REAL_INT** fAdaptedInputs;
         REAL_INT** fAdaptedOutputs;
@@ -158,8 +163,11 @@ class dsp_sample_adapter : public decorator_dsp {
             delete [] fAdaptedOutputs;
         }
     
+        virtual dsp_sample_adapter* clone() { return new dsp_sample_adapter(fDSP->clone()); }
+    
         virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
+            assert(count <= 4096);
             adaptInputBuffers(count, inputs);
             // DSP base class uses FAUSTFLOAT** type, so reinterpret_cast has to be used even if the real DSP uses REAL_INT
             fDSP->compute(count, reinterpret_cast<FAUSTFLOAT**>(fAdaptedInputs), reinterpret_cast<FAUSTFLOAT**>(fAdaptedOutputs));
@@ -168,11 +176,12 @@ class dsp_sample_adapter : public decorator_dsp {
     
         virtual void compute(double date_usec, int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
+            assert(count <= 4096);
             adaptInputBuffers(count, inputs);
             // DSP base class uses FAUSTFLOAT** type, so reinterpret_cast has to be used even if the real DSP uses REAL_INT
             fDSP->compute(date_usec, count, reinterpret_cast<FAUSTFLOAT**>(fAdaptedInputs), reinterpret_cast<FAUSTFLOAT**>(fAdaptedOutputs));
             adaptOutputsBuffers(count, outputs);
-       }
+        }
 };
 
 // Template used to specialize double parameters expressed as NUM/DENOM
@@ -201,16 +210,16 @@ struct Identity : public Filter<fVslider0, fVslider1> {
 // Generated with process = fi.lowpass(3, ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass3 : public Filter<fVslider0, fVslider1> {
-
+    
     REAL fVec0[2];
     REAL fRec1[2];
     REAL fRec0[3];
-
-    inline REAL mydsp_faustpower2_f(REAL value)
+    
+    inline REAL LowPass3_faustpower2_f(REAL value)
     {
         return (value * value);
     }
-
+    
     LowPass3()
     {
         for (int l0 = 0; (l0 < 2); l0 = (l0 + 1)) {
@@ -223,7 +232,7 @@ struct LowPass3 : public Filter<fVslider0, fVslider1> {
             fRec0[l2] = 0.0;
         }
     }
-
+    
     inline void compute(int count, FAUSTFLOAT* input0, FAUSTFLOAT* output0)
     {
         // Computed at template specialization time
@@ -233,7 +242,7 @@ struct LowPass3 : public Filter<fVslider0, fVslider1> {
         REAL fSlow3 = (1.0 / (fSlow1 + 1.0));
         REAL fSlow4 = (1.0 - fSlow1);
         REAL fSlow5 = (((fSlow1 + -1.0000000000000002) / fSlow0) + 1.0);
-        REAL fSlow6 = (2.0 * (1.0 - (1.0 / mydsp_faustpower2_f(fSlow0))));
+        REAL fSlow6 = (2.0 * (1.0 - (1.0 / LowPass3_faustpower2_f(fSlow0))));
         // Computed at runtime
         for (int i = 0; (i < count); i = (i + 1)) {
             REAL fTemp0 = REAL(input0[i]);
@@ -256,7 +265,7 @@ struct LowPass4 : public Filter<fVslider0, fVslider1> {
     REAL fRec1[3];
     REAL fRec0[3];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass4_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -279,7 +288,7 @@ struct LowPass4 : public Filter<fVslider0, fVslider1> {
         REAL fSlow2 = (1.0 / (((fSlow1 + 0.76536686473017945) / fSlow0) + 1.0));
         REAL fSlow3 = (1.0 / (((fSlow1 + 1.8477590650225735) / fSlow0) + 1.0));
         REAL fSlow4 = (((fSlow1 + -1.8477590650225735) / fSlow0) + 1.0);
-        REAL fSlow5 = (2.0 * (1.0 - (1.0 / mydsp_faustpower2_f(fSlow0))));
+        REAL fSlow5 = (2.0 * (1.0 - (1.0 / LowPass4_faustpower2_f(fSlow0))));
         REAL fSlow6 = (((fSlow1 + -0.76536686473017945) / fSlow0) + 1.0);
         // Computed at runtime
         for (int i = 0; (i < count); i = (i + 1)) {
@@ -297,12 +306,12 @@ struct LowPass4 : public Filter<fVslider0, fVslider1> {
 // Generated with process = fi.lowpass3e(ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass3e : public Filter<fVslider0, fVslider1> {
-
+    
     REAL fRec1[3];
     REAL fVec0[2];
     REAL fRec0[2];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass3e_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -328,7 +337,7 @@ struct LowPass3e : public Filter<fVslider0, fVslider1> {
         REAL fSlow2 = (1.0 / (fSlow1 + 0.82244590899881598));
         REAL fSlow3 = (0.82244590899881598 - fSlow1);
         REAL fSlow4 = (1.0 / (((fSlow1 + 0.80263676416103003) / fSlow0) + 1.4122708937742039));
-        REAL fSlow5 = mydsp_faustpower2_f(fSlow0);
+        REAL fSlow5 = LowPass3e_faustpower2_f(fSlow0);
         REAL fSlow6 = (0.019809144837788999 / fSlow5);
         REAL fSlow7 = (fSlow6 + 1.1615164189826961);
         REAL fSlow8 = (((fSlow1 + -0.80263676416103003) / fSlow0) + 1.4122708937742039);
@@ -352,12 +361,12 @@ struct LowPass3e : public Filter<fVslider0, fVslider1> {
 // Generated with process = fi.lowpass6e(ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass6e : public Filter<fVslider0, fVslider1> {
-
+    
     REAL fRec2[3];
     REAL fRec1[3];
     REAL fRec0[3];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass6e_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -381,7 +390,7 @@ struct LowPass6e : public Filter<fVslider0, fVslider1> {
         REAL fSlow0 = std::tan((3.1415926535897931 * (REAL(fVslider0::value()) / REAL(fVslider1))));
         REAL fSlow1 = (1.0 / fSlow0);
         REAL fSlow2 = (1.0 / (((fSlow1 + 0.16840487111358901) / fSlow0) + 1.0693584077073119));
-        REAL fSlow3 = mydsp_faustpower2_f(fSlow0);
+        REAL fSlow3 = LowPass6e_faustpower2_f(fSlow0);
         REAL fSlow4 = (1.0 / fSlow3);
         REAL fSlow5 = (fSlow4 + 53.536152954556727);
         REAL fSlow6 = (1.0 / (((fSlow1 + 0.51247864188914105) / fSlow0) + 0.68962136448467504));
@@ -468,7 +477,7 @@ struct dsp_bus : public dsp {
 // Base class for sample-rate adapter
 template <typename FILTER>
 class sr_sampler : public decorator_dsp {
-
+    
     protected:
     
         std::vector<FILTER> fInputLowPass;
@@ -487,7 +496,7 @@ class sr_sampler : public decorator_dsp {
                 fOutputLowPass.push_back(FILTER());
             }
         }
- };
+};
 
 // Down sample-rate adapter
 template <typename FILTER>
@@ -513,12 +522,14 @@ class dsp_down_sampler : public sr_sampler<FILTER> {
             this->fDSP->instanceConstants(sample_rate / this->getFactor());
         }
     
+        virtual dsp_down_sampler* clone() { return new dsp_down_sampler(decorator_dsp::clone()); }
+    
         virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
             int real_count = count / this->getFactor();
-           
+            
             // Adapt inputs
-            FAUSTFLOAT* fInputs[this->fDSP->getNumInputs()];
+            FAUSTFLOAT** fInputs = (FAUSTFLOAT**)alloca(this->fDSP->getNumInputs() * sizeof(FAUSTFLOAT*));
             for (int chan = 0; chan < this->fDSP->getNumInputs(); chan++) {
                 // Lowpass filtering in place on 'inputs'
                 this->fInputLowPass[chan].compute(count, inputs[chan], inputs[chan]);
@@ -531,7 +542,7 @@ class dsp_down_sampler : public sr_sampler<FILTER> {
             }
             
             // Allocate fOutputs with 'real_count' frames
-            FAUSTFLOAT* fOutputs[this->fDSP->getNumOutputs()];
+            FAUSTFLOAT** fOutputs = (FAUSTFLOAT**)alloca(this->fDSP->getNumOutputs() * sizeof(FAUSTFLOAT*));
             for (int chan = 0; chan < this->fDSP->getNumOutputs(); chan++) {
                 fOutputs[chan] = (FAUSTFLOAT*)alloca(sizeof(FAUSTFLOAT) * real_count);
             }
@@ -581,6 +592,8 @@ class dsp_up_sampler : public sr_sampler<FILTER> {
             this->fDSP->instanceConstants(sample_rate * this->getFactor());
         }
     
+        virtual dsp_up_sampler* clone() { return new dsp_up_sampler(decorator_dsp::clone()); }
+    
         virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
         {
             int real_count = count * this->getFactor();
@@ -627,5 +640,209 @@ class dsp_up_sampler : public sr_sampler<FILTER> {
         virtual void compute(double /*date_usec*/, int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs) { compute(count, inputs, outputs); }
 };
 
+// Create a UP/DS + Filter adapted DSP
+template <typename REAL>
+dsp* createSRAdapter(dsp* DSP, int ds = 0, int us = 0, int filter = 0)
+{
+    if (ds > 0) {
+        switch (filter) {
+            case 0:
+                if (ds == 2) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 2>>(DSP);
+                } else if (ds == 3) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 3>>(DSP);
+                } else if (ds == 4) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 4>>(DSP);
+                } else if (ds == 8) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 8>>(DSP);
+                } else if (ds == 16) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 16>>(DSP);
+                } else if (ds == 32) {
+                    return new dsp_down_sampler<Identity<Double<1,1>, 32>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : ds factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 1:
+                if (ds == 2) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 2, REAL>>(DSP);
+                } else if (ds == 3) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 3, REAL>>(DSP);
+                } else if (ds == 4) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 4, REAL>>(DSP);
+                } else if (ds == 8) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 8, REAL>>(DSP);
+                } else if (ds == 16) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 16, REAL>>(DSP);
+                } else if (ds == 32) {
+                    return new dsp_down_sampler<LowPass3<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : ds factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 2:
+                if (ds == 2) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 2, REAL>>(DSP);
+                } else if (ds == 3) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 3, REAL>>(DSP);
+                } else if (ds == 4) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 4, REAL>>(DSP);
+                } else if (ds == 8) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 8, REAL>>(DSP);
+                } else if (ds == 16) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 16, REAL>>(DSP);
+                } else if (ds == 32) {
+                    return new dsp_down_sampler<LowPass4<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : ds factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 3:
+                if (ds == 2) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 2, REAL>>(DSP);
+                } else if (ds == 3) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 3, REAL>>(DSP);
+                } else if (ds == 4) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 4, REAL>>(DSP);
+                } else if (ds == 8) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 8, REAL>>(DSP);
+                } else if (ds == 16) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 16, REAL>>(DSP);
+                } else if (ds == 32) {
+                    return new dsp_down_sampler<LowPass3e<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : ds factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 4:
+                if (ds == 2) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 2, REAL>>(DSP);
+                } else if (ds == 3) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 3, REAL>>(DSP);
+                } else if (ds == 4) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 4, REAL>>(DSP);
+                } else if (ds == 8) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 8, REAL>>(DSP);
+                } else if (ds == 16) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 16, REAL>>(DSP);
+                } else if (ds == 32) {
+                    return new dsp_down_sampler<LowPass6e<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : ds factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            default:
+                fprintf(stderr, "ERROR : filter type must be in [0..4] range\n");
+                assert(false);
+                return nullptr;
+        }
+    } else if (us > 0) {
+        
+        switch (filter) {
+            case 0:
+                if (us == 2) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 2>>(DSP);
+                } else if (us == 3) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 3>>(DSP);
+                } else if (us == 4) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 4>>(DSP);
+                } else if (us == 8) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 8>>(DSP);
+                } else if (us == 16) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 16>>(DSP);
+                } else if (us == 32) {
+                    return new dsp_up_sampler<Identity<Double<1,1>, 32>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : us factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 1:
+                if (us == 2) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 2, REAL>>(DSP);
+                } else if (us == 3) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 3, REAL>>(DSP);
+                } else if (us == 4) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 4, REAL>>(DSP);
+                } else if (us == 8) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 8, REAL>>(DSP);
+                } else if (us == 16) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 16, REAL>>(DSP);
+                } else if (us == 32) {
+                    return new dsp_up_sampler<LowPass3<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : us factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 2:
+                if (us == 2) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 2, REAL>>(DSP);
+                } else if (us == 3) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 3, REAL>>(DSP);
+                } else if (us == 4) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 4, REAL>>(DSP);
+                } else if (us == 8) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 8, REAL>>(DSP);
+                } else if (us == 16) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 16, REAL>>(DSP);
+                } else if (us == 32) {
+                    return new dsp_up_sampler<LowPass4<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : us factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 3:
+                if (us == 2) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 2, REAL>>(DSP);
+                } else if (us == 3) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 3, REAL>>(DSP);
+                } else if (us == 4) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 4, REAL>>(DSP);
+                } else if (us == 8) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 8, REAL>>(DSP);
+                } else if (us == 16) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 16, REAL>>(DSP);
+                } else if (us == 32) {
+                    return new dsp_up_sampler<LowPass3e<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : us factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            case 4:
+                if (us == 2) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 2, REAL>>(DSP);
+                } else if (us == 3) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 3, REAL>>(DSP);
+                } else if (us == 4) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 4, REAL>>(DSP);
+                } else if (us == 8) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 8, REAL>>(DSP);
+                } else if (us == 16) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 16, REAL>>(DSP);
+                } else if (us == 32) {
+                    return new dsp_up_sampler<LowPass6e<Double<45,100>, 32, REAL>>(DSP);
+                } else {
+                    fprintf(stderr, "ERROR : us factor type must be in [2..32] range\n");
+                    assert(false);
+                    return nullptr;
+                }
+            default:
+                fprintf(stderr, "ERROR : filter type must be in [0..4] range\n");
+                assert(false);
+                return nullptr;
+        }
+    } else {
+        return DSP;
+    }
+}
+    
 #endif
-/**************************  END  dsp-adapter.h **************************/
+/************************** END dsp-adapter.h **************************/

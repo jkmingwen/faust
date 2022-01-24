@@ -52,7 +52,6 @@ static string replaceChar(string str, char src, char dst)
 int main(int argc, char* argv[])
 {
     char name[256];
-    char filename[256];
     char rcfilename[256];
     char* home = getenv("HOME");
     
@@ -70,8 +69,7 @@ int main(int argc, char* argv[])
     
     const char* ip = lopts(argv, "-ip", "localhost");
     int in_port = lopt(argv, "-port", 5511);
-    int out_port = lopt(argv, "-outport", 5510);
-    
+    int out_port = lopt(argv, "-outport", 5510);    
     
     dsp* DSP = nullptr;
     try {
@@ -81,9 +79,10 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     
-    // Controller
+    // OSC controller
     OSCUI oscinterface(argv[1], argc, argv);
     DSP->buildUserInterface(&oscinterface);
+    oscinterface.run();
     
     // UI
     GTKUI interface(argv[1], &argc, &argv);
@@ -94,7 +93,8 @@ int main(int argc, char* argv[])
     DSP->buildUserInterface(&finterface);
     finterface.recallState(rcfilename);
     
-    GUI::runAllGuis();
+    interface.run();
+    
     finterface.saveState(rcfilename);
     
     delete DSP;

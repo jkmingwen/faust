@@ -33,6 +33,8 @@
  ************************************************************************
  ************************************************************************/
 
+#include <string.h> // for memset
+
 #include "teensy.h"
 
 // IMPORTANT: in order for MapUI to work, the teensy linker must be g++
@@ -98,9 +100,8 @@ AudioFaust::AudioFaust() : AudioStream(FAUST_INPUTS, new audio_block_t*[FAUST_IN
 {
 #ifdef NVOICES
     int nvoices = NVOICES;
-    mydsp_poly* dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, true);
-    fDSP = dsp_poly;
-#else
+    fDSP =  new mydsp_poly(new mydsp(), nvoices, true, true);
+ #else
     fDSP = new mydsp();
 #endif
     
@@ -131,9 +132,6 @@ AudioFaust::AudioFaust() : AudioStream(FAUST_INPUTS, new audio_block_t*[FAUST_IN
     
 #if MIDICTRL
     fMIDIHandler = new teensy_midi();
-#ifdef NVOICES
-    fMIDIHandler->addMidiIn(dsp_poly);
-#endif
     fMIDIInterface = new MidiUI(fMIDIHandler);
     fDSP->buildUserInterface(fMIDIInterface);
     fMIDIInterface->run();
@@ -172,11 +170,15 @@ void AudioFaust::updateImp(void)
         audio_block_t* inBlock[INPUTS];
         for (int channel = 0; channel < INPUTS; channel++) {
             inBlock[channel] = receiveReadOnly(channel);
-            for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-                int32_t val = inBlock[channel]->data[i] << 16;
-                fInChannel[channel][i] = val*DIV_16;
+            if (inBlock[channel]) {
+                for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
+                    int32_t val = inBlock[channel]->data[i] << 16;
+                    fInChannel[channel][i] = val*DIV_16;
+                }
+                release(inBlock[channel]);
+            } else {
+                memset(fInChannel[channel], 0, AUDIO_BLOCK_SAMPLES * sizeof(float));
             }
-            release(inBlock[channel]);
         }
     }
     

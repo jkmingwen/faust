@@ -25,7 +25,6 @@
 #ifndef __teensy_midi__
 #define __teensy_midi__
 
-#include <iostream>
 #include <cstdlib>
 
 #include "Arduino.h"
@@ -33,6 +32,9 @@
 
 extern usb_midi_class gUSBMIDI;
 
+/**
+ *  MIDI input/output handling for the Teensy: https://www.pjrc.com/teensy/
+ */
 class teensy_midi : public midi_handler {
     
     public:

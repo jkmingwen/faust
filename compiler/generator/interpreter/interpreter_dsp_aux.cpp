@@ -27,6 +27,7 @@
 using namespace std;
 
 #ifdef MACHINE
+#include "sha_key.hh"
 void faustassertaux(bool cond, const string& file, int line)
 {
     if (!cond) {
@@ -197,11 +198,16 @@ EXPORT interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const s
     }
 }
 
-EXPORT void writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const string& bitcode_path)
+EXPORT bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const string& bitcode_path)
 {
     LOCK_API
     ofstream writer(bitcode_path.c_str());
-    factory->write(&writer, true);
+    if (writer.is_open()) {
+        factory->write(&writer, true);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 EXPORT void interpreter_dsp::metadata(Meta* meta)

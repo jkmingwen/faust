@@ -26,7 +26,7 @@
 #define FAUST_ESP32CONTROL_H
 
 #include <string>
-#include <iostream>
+#include <stdio.h>
 #include <vector>
 #include <string.h>
 
@@ -209,15 +209,11 @@ class Esp32ControlUI : public GenericUI
                 if (fCheckButton.size() > 0) {
                     int button = gpio_get_level(GPIO_NUM_14);
                     for (int i = 0; i < fCheckButton.size(); i++) {
-                        if (button == 1) {
-                            if (fLastButton == 0) {
-                                // Upfront detected
-                                *fCheckButton[i] = !(*fCheckButton[i]);
-                                fLastButton = button;
-                            }
-                        } else {
-                            fLastButton = 0;
+                        if ((button == 1) && (button != fLastButton)) {
+                            // Upfront detected
+                            *fCheckButton[i] = !(*fCheckButton[i]);
                         }
+                        fLastButton = button;
                     }
                 }
                 
@@ -253,6 +249,9 @@ class Esp32ControlUI : public GenericUI
         Esp32ControlUI():fLastButton(0), fProcessHandle(nullptr)
         {
             adc1_config_width(ADC_WIDTH_BIT_12);
+            adc1_config_channel_atten(ADC1_CHANNEL_7,ADC_ATTEN_DB_11);
+            adc1_config_channel_atten(ADC1_CHANNEL_4,ADC_ATTEN_DB_11);
+            adc1_config_channel_atten(ADC1_CHANNEL_6,ADC_ATTEN_DB_11);
             gpio_config_t io_conf;
             io_conf.intr_type = (gpio_int_type_t) GPIO_PIN_INTR_POSEDGE;
             io_conf.pin_bit_mask = ((1ULL<<4) | (1ULL<<13) | (1ULL<<14) | (1ULL<<15));
@@ -263,9 +262,9 @@ class Esp32ControlUI : public GenericUI
     
         virtual ~Esp32ControlUI()
         {
-            for (auto& it : fKnob1Converter) delete it;
-            for (auto& it : fKnob2Converter) delete it;
-            for (auto& it : fKnob3Converter) delete it;
+            for (const auto& it : fKnob1Converter) delete it;
+            for (const auto& it : fKnob2Converter) delete it;
+            for (const auto& it : fKnob3Converter) delete it;
             stop();
         }
     
@@ -287,7 +286,7 @@ class Esp32ControlUI : public GenericUI
         void addButton(const char* label, FAUSTFLOAT* zone)
         {
             if (fKey == "switch") {
-                std::cout << "addButton " << std::endl;
+                fprintf(stdout, "addButton\n");
                 fPushButton.push_back(zone);
             }
             fValue = fKey = "";
@@ -295,7 +294,7 @@ class Esp32ControlUI : public GenericUI
         void addCheckButton(const char* label, FAUSTFLOAT* zone)
         {
             if (fKey == "switch") {
-                std::cout << "addCheckButton " << std::endl;
+                fprintf(stdout, "addCheckButton\n");
                 fCheckButton.push_back(zone);
             }
             fValue = fKey = "";
@@ -312,15 +311,15 @@ class Esp32ControlUI : public GenericUI
         {
             if (fKey == "knob") {
                 if (fValue == "1") {
-                    std::cout << "knob1 " << min << " " << max << std::endl;
+                    fprintf(stdout, "knob1 %f %f\n", min, max);
                     fKnob1Converter.push_back(new FilteredConverter(zone, new LinearValueConverter(0., 4095., min, max)));
                 } else if (fValue == "2") {
-                    std::cout << "knob2 " << min << " " << max << std::endl;
+                    fprintf(stdout, "knob2 %f %f\n", min, max);
                     fKnob2Converter.push_back(new FilteredConverter(zone, new LinearValueConverter(0., 4095., min, max)));
                 } else if (fValue == "3") {
-                    std::cout << "knob3 " << min << " " << max << std::endl;
+                    fprintf(stdout, "knob3 %f %f\n", min, max);
                     // This control does not use the full range of [0 4095]
-                    fKnob3Converter.push_back(new FilteredConverter(zone, new LinearValueConverter(2400., 4095., min, max)));
+                    fKnob3Converter.push_back(new FilteredConverter(zone, new LinearValueConverter(2700., 4095., min, max)));
                 }
             }
             fValue = fKey = "";
@@ -330,7 +329,7 @@ class Esp32ControlUI : public GenericUI
         void declare(FAUSTFLOAT* zone, const char* key, const char* val)
         {
             if (strcmp(key, "switch") == 0 || strcmp(key, "knob") == 0) {
-                std::cout << "key " << key << " val " << val << std::endl;
+                fprintf(stdout, "key %s val %s\n", key, val);
                 fKey = key;
                 fValue = val;
             }

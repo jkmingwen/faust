@@ -24,7 +24,7 @@ MIDI=0
 echoHelp ()
 {
     echo "FAUST2TEENSY HELP"
-    echo "faust2teensy can be used to fully program the Teensy microcontroller and to generate DSP objects compatible with the Teensy audio library. In both cases, we strongly recommend to use the Teensy 3.6 which hosts an FPU (i.e., the Teensy 3.2 doesn't have one). Additional information about this tool can be found on the Faust website: https://faust.grame.fr."
+    echo "faust2teensy can be used to fully program the Teensy microcontroller and to generate DSP objects compatible with the Teensy audio library. In both cases, we strongly recommend to use the Teensy 3.6 which hosts an FPU (i.e., the Teensy 3.2 doesn't have one). "
     option
     option -lib "generates a package containing an object compatible with the Teensy audio library."
     option -midi
@@ -48,7 +48,7 @@ do
         NVOICES=$1
     elif [ $p = "-midi" ]; then
         MIDI=1
-    elif [[ -f "$p" ]]; then
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
         FILE="$p"
     elif [ $p = "-lib" ]; then
         LIB=1
@@ -78,7 +78,7 @@ MODULENAME="${BASENAME%.dsp}"
 
 if [ $LIB -eq 1 ]; then
     mkdir -p $MODULENAME
-    faust -uim -a $FAUSTARCH/teensy/teensy.cpp -i $FILE -o $MODULENAME/$MODULENAME.cpp
+    faust $OPTIONS -uim -a $FAUSTARCH/teensy/teensy.cpp -i $FILE -o $MODULENAME/$MODULENAME.cpp
     if [ $NVOICES -gt 0 ]; then
         echo '#define NVOICES '$NVOICES >> $MODULENAME/$MODULENAME.h
     fi

@@ -87,6 +87,7 @@ int main(int argc, char* argv[])
     bool is_osc = isopt(argv, "-osc");
     bool is_httpd = isopt(argv, "-httpd");
     bool is_resample = isopt(argv, "-resample");
+    bool is_double = isopt(argv, "-double");
     int nvoices = lopt(argv, "-nvoices", -1);
     
     malloc_memory_manager manager;
@@ -112,7 +113,7 @@ int main(int argc, char* argv[])
     coreaudio audio(44100, 512);
     string error_msg;
     
-    cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     int argc1 = 0;
     const char* argv1[64];
@@ -210,7 +211,7 @@ int main(int argc, char* argv[])
     }
     
     //factory->setMemoryManager(&manager);  // causes crash in -fm mode
-    DSP = factory->createPolyDSPInstance(nvoices, true, true);
+    DSP = factory->createPolyDSPInstance(nvoices, true, true, is_double);
     if (!DSP) {
         cerr << "Cannot create instance "<< endl;
         exit(EXIT_FAILURE);
@@ -218,10 +219,6 @@ int main(int argc, char* argv[])
     
     cout << "getName " << factory->getName() << endl;
     //cout << "getSHAKey " << factory->getSHAKey() << endl;
-    
-    if (isopt(argv, "-double")) {
-        cout << "Running in double..." << endl;
-    }
     
     /*
      JSONUI json(DSP->getNumInputs(), DSP->getNumOutputs());
@@ -246,10 +243,7 @@ int main(int argc, char* argv[])
     } else {
         soundinterface = new SoundUI();
     }
-    // SoundUI has to be dispatched on all internal voices
-    DSP->setGroup(false);
     DSP->buildUserInterface(soundinterface);
-    DSP->setGroup(true);
     
     if (is_httpd) {
         httpdinterface = new httpdUI(name, DSP->getNumInputs(), DSP->getNumOutputs(), argc, argv);
@@ -260,10 +254,9 @@ int main(int argc, char* argv[])
         oscinterface = new OSCUI(filename, argc, argv);
         DSP->buildUserInterface(oscinterface);
     }
-    rt_midi midi_handler(name);
-    midi_handler.addMidiIn(DSP);
-    
+   
     if (is_midi) {
+        rt_midi midi_handler(name);
         midiinterface = new MidiUI(&midi_handler);
         DSP->buildUserInterface(midiinterface);
         cout << "MIDI is on" << endl;
