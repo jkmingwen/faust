@@ -40,12 +40,13 @@ OSCLIB=""
 
 for p in $@; do
     if [ $p = "-help" ] || [ $p = "-h" ]; then
-        usage faust2alqt "[options] <file.dsp>"
+        usage faust2alqt "[options] [Faust options] <file.dsp>"
         platform Linux
         require Alsa, Qt
         echo "Compiles Faust programs to ALSA and QT"
         option
         options -httpd -osc -midi -qrcode -poly
+        option "Faust options"
         exit
     fi
   
@@ -59,6 +60,7 @@ for p in $@; do
     elif [ "$p" = "-httpd" ]; then
         HTTPDEFS="DEFINES += HTTPCTRL"
         HTTPLIBS="-lHTTPDFaust -lmicrohttpd"
+        HTTPLIBS1=`pkg-config --cflags --libs libmicrohttpd`
     elif [ "$p" = "-qrcode" ]; then # requires -httpd
         QRDEFS="DEFINES += QRCODECTRL"
     elif [ ${p:0:1} = "-" ]; then
@@ -98,7 +100,7 @@ for p in $FILES; do
     # compile c++ to binary
     (
         cd "$TMP"
-        $QMAKE -project "QT += widgets printsupport network" "INCLUDEPATH+=$CUR" "INCLUDEPATH+=$FAUSTINC" "QMAKE_CXXFLAGS=$CXXFLAGS -Wno-unused-parameter $FAUSTTOOLSFLAGS" "QMAKE_LFLAGS=$LFLAGS" "LIBS+=$ARCHLIB $OSCLIBS $HTTPLIBS" "HEADERS+=$FAUSTINC/faust/gui/QTUI.h" "RESOURCES+= $FAUSTINC/faust/gui/Styles/Grey.qrc" "$OSCDEFS" "$HTTPDEFS" "$QRDEFS" "$POLYDEFS" "$MIDIDEFS"  
+        $QMAKE -project "QT += widgets printsupport network" "INCLUDEPATH+=$CUR" "INCLUDEPATH+=$FAUSTINC" "QMAKE_CXXFLAGS=$CXXFLAGS -Wno-unused-parameter $FAUSTTOOLSFLAGS" "QMAKE_LFLAGS=$LFLAGS" "LIBS+=$ARCHLIB $OSCLIBS $HTTPLIBS $HTTPLIBS1" "HEADERS+=$FAUSTINC/faust/gui/QTUI.h" "RESOURCES+= $FAUSTINC/faust/gui/Styles/Grey.qrc" "$OSCDEFS" "$HTTPDEFS" "$QRDEFS" "$POLYDEFS" "$MIDIDEFS"  
         $QMAKE $SPEC QMAKE_CFLAGS_ISYSTEM=-I
         make
     ) > /dev/null || exit

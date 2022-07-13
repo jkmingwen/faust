@@ -1,7 +1,7 @@
-/************************************************************************
- ************************************************************************
- Copyright (C) 2021 GRAME, Centre National de Creation Musicale
- 
+/**************************************************************************
+ FAUST Architecture File
+ Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU Lesser General Public License as published by
  the Free Software Foundation; either version 2.1 of the License, or
@@ -9,24 +9,28 @@
  
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  GNU Lesser General Public License for more details.
  
  You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  
- ************************************************************************
- ************************************************************************/
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ ***************************************************************************/
 
 #ifndef LIBFAUSTCOMMON_C_H
 #define LIBFAUSTCOMMON_C_H
+
+#include "faust/export.h"
 
 /*!
  \addtogroup signalc C interface for the Signal API.
  @{
  */
-
 
 /**
  * Opaque types.
@@ -58,12 +62,12 @@ extern "C"
     /**
      * Create global compilation context, has to be done first.
      */
-    void createLibContext();
+    LIBFAUST_API void createLibContext();
     
     /**
      * Destroy global compilation context, has to be done last.
      */
-    void destroyLibContext();
+    LIBFAUST_API void destroyLibContext();
     
     /**
      * Constant integer : for all t, x(t) = n.
@@ -72,7 +76,7 @@ extern "C"
      *
      * @return the integer value.
      */
-    Signal CsigInt(int n);
+    LIBFAUST_API Signal CsigInt(int n);
     
     /**
      * Constant real : for all t, x(t) = n.
@@ -81,7 +85,7 @@ extern "C"
      *
      * @return the float/double signal.
      */
-    Signal CsigReal(double n);
+    LIBFAUST_API Signal CsigReal(double n);
     
     /**
      * Create an input.
@@ -90,7 +94,7 @@ extern "C"
      *
      * @return the input signal.
      */
-    Signal CsigInput(int idx);
+    LIBFAUST_API Signal CsigInput(int idx);
     
     /**
      * Create a delayed signal.
@@ -100,7 +104,7 @@ extern "C"
      *
      * @return the delayed signal.
      */
-    Signal CsigDelay(Signal s, Signal del);
+    LIBFAUST_API Signal CsigDelay(Signal s, Signal del);
     
     /**
      * Create a casted signal.
@@ -109,7 +113,7 @@ extern "C"
      *
      * @return the casted signal.
      */
-    Signal CsigIntCast(Signal s);
+    LIBFAUST_API Signal CsigIntCast(Signal s);
     
     /**
      * Create a casted signal.
@@ -118,7 +122,7 @@ extern "C"
      *
      * @return the casted signal.
      */
-    Signal CsigFloatCast(Signal s);
+    LIBFAUST_API Signal CsigFloatCast(Signal s);
     
     /**
      * Create a read only table.
@@ -129,7 +133,7 @@ extern "C"
      *
      * @return the table signal.
      */
-    Signal CsigReadOnlyTable(Signal n, Signal init, Signal ridx);
+    LIBFAUST_API Signal CsigReadOnlyTable(Signal n, Signal init, Signal ridx);
     
     /**
      * Create a read/write table.
@@ -142,7 +146,7 @@ extern "C"
      *
      * @return the table signal.
      */
-    Signal CsigWriteReadTable(Signal n, Signal init, Signal widx, Signal wsig, Signal ridx);
+    LIBFAUST_API Signal CsigWriteReadTable(Signal n, Signal init, Signal widx, Signal wsig, Signal ridx);
     
     /**
      * Create a waveform.
@@ -151,7 +155,7 @@ extern "C"
      *
      * @return the waveform signal.
      */
-    Signal CsigWaveform(Signal* wf);
+    LIBFAUST_API Signal CsigWaveform(Signal* wf);
     // Use: CsigInt(size of wf); to generate the waveform size signal
     
     /**
@@ -161,7 +165,7 @@ extern "C"
      *
      * @return the soundfile block.
      */
-    Signal CsigSoundfile(const char* label);
+    LIBFAUST_API Signal CsigSoundfile(const char* label);
     
     /**
      * Create the length signal of a given soundfile in frames.
@@ -171,7 +175,7 @@ extern "C"
      *
      * @return the length signal.
      */
-    Signal CsigSoundfileLength(Signal sf, Signal part);
+    LIBFAUST_API Signal CsigSoundfileLength(Signal sf, Signal part);
     
     /**
      * Create the rate signal of a given soundfile in Hz.
@@ -181,7 +185,7 @@ extern "C"
      *
      * @return the rate signal.
      */
-    Signal CsigSoundfileRate(Signal sf, Signal part);
+    LIBFAUST_API Signal CsigSoundfileRate(Signal sf, Signal part);
     
     /**
      * Create the buffer signal of a given soundfile.
@@ -193,7 +197,7 @@ extern "C"
      *
      * @return the buffer signal.
      */
-    Signal CsigSoundfileBuffer(Signal sf, Signal chan, Signal part, Signal ridx);
+    LIBFAUST_API Signal CsigSoundfileBuffer(Signal sf, Signal chan, Signal part, Signal ridx);
     
     /**
      * Create a selector between two signals.
@@ -205,7 +209,7 @@ extern "C"
      *
      * @return the selected signal depending of the selector value at each time t.
      */
-    Signal CsigSelect2(Signal selector, Signal s1, Signal s2);
+    LIBFAUST_API Signal CsigSelect2(Signal selector, Signal s1, Signal s2);
     
     /**
      * Create a selector between three signals.
@@ -218,7 +222,7 @@ extern "C"
      *
      * @return the selected signal depending of the selector value at each time t.
      */
-    Signal CsigSelect3(Signal selector, Signal s1, Signal s2, Signal s3);
+    LIBFAUST_API Signal CsigSelect3(Signal selector, Signal s1, Signal s2, Signal s3);
       
     /**
      * Create a foreign constant signal.
@@ -229,7 +233,7 @@ extern "C"
      *
      * @return the foreign constant signal.
      */
-    Signal CsigFConst(enum SType type, const char* name, const char* file);
+    LIBFAUST_API Signal CsigFConst(enum SType type, const char* name, const char* file);
     
     /**
      * Create a foreign variable signal.
@@ -240,7 +244,7 @@ extern "C"
      *
      * @return the foreign variable signal.
      */
-    Signal CsigFVar(enum SType type, const char* name, const char* file);
+    LIBFAUST_API Signal CsigFVar(enum SType type, const char* name, const char* file);
     
     /**
      * Generic binary mathematical functions.
@@ -251,7 +255,7 @@ extern "C"
      *
      * @return the result signal of op(x,y).
      */
-    Signal CsigBinOp(enum SOperator op, Signal x, Signal y);
+    LIBFAUST_API Signal CsigBinOp(enum SOperator op, Signal x, Signal y);
     
     /**
      * Specific binary mathematical functions.
@@ -261,62 +265,62 @@ extern "C"
      *
      * @return the result signal of fun(x,y).
      */
-    Signal CsigAdd(Signal x, Signal y);
-    Signal CsigSub(Signal x, Signal y);
-    Signal CsigMul(Signal x, Signal y);
-    Signal CsigDiv(Signal x, Signal y);
-    Signal CsigRem(Signal x, Signal y);
+    LIBFAUST_API Signal CsigAdd(Signal x, Signal y);
+    LIBFAUST_API Signal CsigSub(Signal x, Signal y);
+    LIBFAUST_API Signal CsigMul(Signal x, Signal y);
+    LIBFAUST_API Signal CsigDiv(Signal x, Signal y);
+    LIBFAUST_API Signal CsigRem(Signal x, Signal y);
     
-    Signal CsigLeftShift(Signal x, Signal y);
-    Signal CsigLRightShift(Signal x, Signal y);
-    Signal CsigARightShift(Signal x, Signal y);
+    LIBFAUST_API Signal CsigLeftShift(Signal x, Signal y);
+    LIBFAUST_API Signal CsigLRightShift(Signal x, Signal y);
+    LIBFAUST_API Signal CsigARightShift(Signal x, Signal y);
     
-    Signal CsigGT(Signal x, Signal y);
-    Signal CsigLT(Signal x, Signal y);
-    Signal CsigGE(Signal x, Signal y);
-    Signal CsigLE(Signal x, Signal y);
-    Signal CsigEQ(Signal x, Signal y);
-    Signal CsigNE(Signal x, Signal y);
+    LIBFAUST_API Signal CsigGT(Signal x, Signal y);
+    LIBFAUST_API Signal CsigLT(Signal x, Signal y);
+    LIBFAUST_API Signal CsigGE(Signal x, Signal y);
+    LIBFAUST_API Signal CsigLE(Signal x, Signal y);
+    LIBFAUST_API Signal CsigEQ(Signal x, Signal y);
+    LIBFAUST_API Signal CsigNE(Signal x, Signal y);
     
-    Signal CsigAND(Signal x, Signal y);
-    Signal CsigOR(Signal x, Signal y);
-    Signal CsigXOR(Signal x, Signal y);
+    LIBFAUST_API Signal CsigAND(Signal x, Signal y);
+    LIBFAUST_API Signal CsigOR(Signal x, Signal y);
+    LIBFAUST_API Signal CsigXOR(Signal x, Signal y);
     
     /**
      * Extended unary mathematical functions.
      */
-    Signal CsigAbs(Signal x);
-    Signal CsigAcos(Signal x);
-    Signal CsigTan(Signal x);
-    Signal CsigSqrt(Signal x);
-    Signal CsigSin(Signal x);
-    Signal CsigRint(Signal x);
-    Signal CsigLog(Signal x);
-    Signal CsigLog10(Signal x);
-    Signal CsigFloor(Signal x);
-    Signal CsigExp(Signal x);
-    Signal CsigExp10(Signal x);
-    Signal CsigCos(Signal x);
-    Signal CsigCeil(Signal x);
-    Signal CsigAtan(Signal x);
-    Signal CsigAsin(Signal x);
+    LIBFAUST_API Signal CsigAbs(Signal x);
+    LIBFAUST_API Signal CsigAcos(Signal x);
+    LIBFAUST_API Signal CsigTan(Signal x);
+    LIBFAUST_API Signal CsigSqrt(Signal x);
+    LIBFAUST_API Signal CsigSin(Signal x);
+    LIBFAUST_API Signal CsigRint(Signal x);
+    LIBFAUST_API Signal CsigLog(Signal x);
+    LIBFAUST_API Signal CsigLog10(Signal x);
+    LIBFAUST_API Signal CsigFloor(Signal x);
+    LIBFAUST_API Signal CsigExp(Signal x);
+    LIBFAUST_API Signal CsigExp10(Signal x);
+    LIBFAUST_API Signal CsigCos(Signal x);
+    LIBFAUST_API Signal CsigCeil(Signal x);
+    LIBFAUST_API Signal CsigAtan(Signal x);
+    LIBFAUST_API Signal CsigAsin(Signal x);
     
     /**
      * Extended binary mathematical functions.
      */
-    Signal CsigRemainder(Signal x, Signal y);
-    Signal CsigPow(Signal x, Signal y);
-    Signal CsigMin(Signal x, Signal y);
-    Signal CsigMax(Signal x, Signal y);
-    Signal CsigFmod(Signal x, Signal y);
-    Signal CsigAtan2(Signal x, Signal y);
+    LIBFAUST_API Signal CsigRemainder(Signal x, Signal y);
+    LIBFAUST_API Signal CsigPow(Signal x, Signal y);
+    LIBFAUST_API Signal CsigMin(Signal x, Signal y);
+    LIBFAUST_API Signal CsigMax(Signal x, Signal y);
+    LIBFAUST_API Signal CsigFmod(Signal x, Signal y);
+    LIBFAUST_API Signal CsigAtan2(Signal x, Signal y);
     
     /**
      * Create a recursive signal inside the sigRecursion expression.
      *
      * @return the recursive signal.
      */
-    Signal CsigSelf();
+    LIBFAUST_API Signal CsigSelf();
     
     /**
      * Create a recursive signal. Use sigSelf() to refer to the
@@ -326,7 +330,7 @@ extern "C"
      *
      * @return the signal with a recursion.
      */
-    Signal CsigRecursion(Signal s);
+    LIBFAUST_API Signal CsigRecursion(Signal s);
     
     /**
      * Create a button signal.
@@ -335,7 +339,7 @@ extern "C"
      *
      * @return the button signal.
      */
-    Signal CsigButton(const char* label);
+    LIBFAUST_API Signal CsigButton(const char* label);
     
     /**
      * Create a checkbox signal.
@@ -344,7 +348,7 @@ extern "C"
      *
      * @return the checkbox signal.
      */
-    Signal CsigCheckbox(const char* label);
+    LIBFAUST_API Signal CsigCheckbox(const char* label);
     
     /**
      * Create a vertical slider signal.
@@ -357,7 +361,7 @@ extern "C"
      *
      * @return the vertical slider signal.
      */
-    Signal CsigVSlider(const char* label, Signal init, Signal min, Signal max, Signal step);
+    LIBFAUST_API Signal CsigVSlider(const char* label, Signal init, Signal min, Signal max, Signal step);
     
     /**
      * Create an horizontal slider signal.
@@ -370,7 +374,7 @@ extern "C"
      *
      * @return the horizontal slider signal.
      */
-    Signal CsigHSlider(const char* label, Signal init, Signal min, Signal max, Signal step);
+    LIBFAUST_API Signal CsigHSlider(const char* label, Signal init, Signal min, Signal max, Signal step);
     
     /**
      * Create a num entry signal.
@@ -383,7 +387,7 @@ extern "C"
      *
      * @return the num entry signal.
      */
-    Signal CsigNumEntry(const char* label, Signal init, Signal min, Signal max, Signal step);
+    LIBFAUST_API Signal CsigNumEntry(const char* label, Signal init, Signal min, Signal max, Signal step);
     
     /**
      * Create a vertical bargraph signal.
@@ -395,7 +399,7 @@ extern "C"
      *
      * @return the vertical bargraph signal.
      */
-    Signal CsigVBargraph(const char* label, Signal min, Signal max, Signal s);
+    LIBFAUST_API Signal CsigVBargraph(const char* label, Signal min, Signal max, Signal s);
     
     /**
      * Create an horizontal bargraph signal.
@@ -407,7 +411,7 @@ extern "C"
      *
      * @return the horizontal bargraph signal.
      */
-    Signal CsigHBargraph(const char* label, Signal min, Signal max, Signal s);
+    LIBFAUST_API Signal CsigHBargraph(const char* label, Signal min, Signal max, Signal s);
     
     /**
      * Create an attach signal.
@@ -421,7 +425,7 @@ extern "C"
      *
      * @return the attach signal.
      */
-    Signal CsigAttach(Signal s1, Signal s2);
+    LIBFAUST_API Signal CsigAttach(Signal s1, Signal s2);
     
     /*
      [1] Constant numerical expression : see https://faustdoc.grame.fr/manual/syntax/#constant-numerical-expressions

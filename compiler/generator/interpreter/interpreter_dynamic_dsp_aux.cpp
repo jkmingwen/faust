@@ -28,7 +28,7 @@
 
 using namespace std;
 
-EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromFile(const string& filename, int argc,
+LIBFAUST_API interpreter_dsp_factory* createInterpreterDSPFactoryFromFile(const string& filename, int argc,
                                                                     const char* argv[], string& error_msg)
 {
     string base = basename((char*)filename.c_str());
@@ -43,7 +43,7 @@ EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromFile(const string
     }
 }
 
-EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromString(const string& name_app, const string& dsp_content,
+LIBFAUST_API interpreter_dsp_factory* createInterpreterDSPFactoryFromString(const string& name_app, const string& dsp_content,
                                                                       int argc, const char* argv[], string& error_msg)
 {
     LOCK_API
@@ -92,7 +92,7 @@ EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromString(const stri
     }
 }
 
-EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromSignals(const std::string& name_app, tvec signals,
+LIBFAUST_API interpreter_dsp_factory* createInterpreterDSPFactoryFromSignals(const std::string& name_app, tvec signals,
                                                                        int argc, const char* argv[], std::string& error_msg)
 {
     LOCK_API
@@ -125,9 +125,9 @@ EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromSignals(const std
     }
 }
 
-EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromBoxes(const std::string& name_app, Tree box,
-                                                                     int argc, const char* argv[],
-                                                                     std::string& error_msg)
+LIBFAUST_API interpreter_dsp_factory* createInterpreterDSPFactoryFromBoxes(const std::string& name_app, Tree box,
+                                                                       int argc, const char* argv[],
+                                                                       std::string& error_msg)
 {
     LOCK_API
     try {
@@ -138,3 +138,59 @@ EXPORT interpreter_dsp_factory* createInterpreterDSPFactoryFromBoxes(const std::
         return nullptr;
     }
 }
+
+// Public C interface : lock management is done by called C++ API
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+LIBFAUST_API interpreter_dsp_factory* createCInterpreterDSPFactoryFromFile(const char* filename, int argc,
+                                                                        const char* argv[], char* error_msg)
+{
+    string error_msg_aux;
+    interpreter_dsp_factory* factory =
+        createInterpreterDSPFactoryFromFile(filename, argc, argv, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+
+LIBFAUST_API interpreter_dsp_factory* createCInterpreterDSPFactoryFromString(const char* name_app,
+                                                                          const char* dsp_content, int argc,
+                                                                          const char* argv[], char* error_msg)
+{
+    string error_msg_aux;
+    interpreter_dsp_factory* factory =
+        createInterpreterDSPFactoryFromString(name_app, dsp_content, argc, argv, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+
+LIBFAUST_API interpreter_dsp_factory* createCInterpreterDSPFactoryFromSignals(const char* name_app, Signal* signals_aux,
+                                                                           int argc, const char* argv[],
+                                                                           char* error_msg)
+{
+    string error_msg_aux;
+    tvec signals;
+    int i = 0;
+    while (signals_aux[i]) { signals.push_back(signals_aux[i]); i++; }
+    interpreter_dsp_factory* factory =
+        createInterpreterDSPFactoryFromSignals(name_app, signals, argc, argv, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+
+LIBFAUST_API interpreter_dsp_factory* createCInterpreterDSPFactoryFromBoxes(const char* name_app, Tree box,
+                                                                         int argc, const char* argv[],
+                                                                         char* error_msg)
+{
+    string error_msg_aux;
+    interpreter_dsp_factory* factory =
+        createInterpreterDSPFactoryFromBoxes(name_app, box, argc, argv, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+    
+#ifdef __cplusplus
+}
+#endif

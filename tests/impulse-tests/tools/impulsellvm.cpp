@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
         if (!writeDSPFactoryToBitcodeFile(factory, str.str())) {
              cerr << "ERROR in writeDSPFactoryToBitcodeFile \n";
         }
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromBitcodeFile(str.str(), "", error_msg);
         
         if (!factory) {
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
     {
         string error_msg;
         string factory_str = writeDSPFactoryToBitcode(factory);
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromBitcode(factory_str, "", error_msg);
         
         if (!factory) {
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
         if (!writeDSPFactoryToIRFile(factory, str.str())) {
             cerr << "ERROR in writeDSPFactoryToIRFile \n";
         }
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromIRFile(str.str(), "", error_msg);
         
         if (!factory) {
@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
     {
         string error_msg;
         string factory_str = writeDSPFactoryToIR(factory);
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromIR(factory_str, "", error_msg);
         
         if (!factory) {
@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
         if (!writeDSPFactoryToMachineFile(factory, machine_file_name, "")) {
             cerr << "ERROR in writeDSPFactoryToMachineFile \n";
         }
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromMachineFile(machine_file_name, "", error_msg);
         
         if (!factory) {
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
     {
         string error_msg;
         string factory_str = writeDSPFactoryToMachine(factory, "");
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+        deleteDSPFactory(factory);
         factory = readDSPFactoryFromMachine(factory_str, "", error_msg);
         
         if (!factory) {
@@ -246,9 +246,19 @@ int main(int argc, char* argv[])
     {
         string sha_key;
         string error_msg;
-        string expanded_dsp = expandDSPFromFile(argv[1], argc1, argv1, sha_key, error_msg);
-        factory = createDSPFactoryFromString("FausDSP", expanded_dsp, argc1, argv1, "", error_msg, 3);
+        
+        string expanded_dsp1 = expandDSPFromFile(argv[1], argc1, argv1, sha_key, error_msg);
+        factory = createDSPFactoryFromString("FausDSP", expanded_dsp1, argc1, argv1, "", error_msg, 3);
     
+        if (!factory) {
+            cerr << "ERROR in expandDSPFromFile " << error_msg;
+            exit(-1);
+        }
+        
+        // Second time to check [FIX] expand code related global variables moved in 'global' class. 
+        string expanded_dsp2 = expandDSPFromFile(argv[1], argc1, argv1, sha_key, error_msg);
+        factory = createDSPFactoryFromString("FausDSP", expanded_dsp2, argc1, argv1, "", error_msg, 3);
+        
         if (!factory) {
             cerr << "ERROR in expandDSPFromFile " << error_msg;
             exit(-1);

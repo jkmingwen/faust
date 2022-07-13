@@ -1,24 +1,26 @@
-/************************** BEGIN interpreter-machine-dsp.h **************************/
-/************************************************************************
- ************************************************************************
- Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
- 
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU Lesser General Public License as published by
- the Free Software Foundation; either version 2.1 of the License, or
- (at your option) any later version.
- 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU Lesser General Public License for more details.
- 
- You should have received a copy of the GNU Lesser General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- 
- ************************************************************************
- ************************************************************************/
+/************************** BEGIN interpreter-machine-dsp.h *************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+************************************************************************/
 
 #ifndef INTERPRETER_MACHINE_DSP_H
 #define INTERPRETER_MACHINE_DSP_H
@@ -45,12 +47,12 @@
  *
  * @return the library version as a static string.
  */
-extern "C" const char* getCLibFaustVersion();
+extern "C" LIBFAUST_API const char* getCLibFaustVersion();
 
 /**
  * DSP instance class with methods.
  */
-class interpreter_dsp : public dsp {
+class LIBFAUST_API interpreter_dsp : public dsp {
     
     private:
     
@@ -89,7 +91,7 @@ class interpreter_dsp : public dsp {
 * Interpreter DSP factory class.
 */
 
-class interpreter_dsp_factory : public dsp_factory {
+class LIBFAUST_API interpreter_dsp_factory : public dsp_factory {
 
      public:
     
@@ -138,18 +140,18 @@ class interpreter_dsp_factory : public dsp_factory {
  *
  * @return a DSP factory if one is associated with the SHA key, otherwise a null pointer.
  */
-interpreter_dsp_factory* getInterpreterDSPFactoryFromSHAKey(const std::string& sha_key);
+LIBFAUST_API interpreter_dsp_factory* getInterpreterDSPFactoryFromSHAKey(const std::string& sha_key);
 
 /**
  * Delete a Faust DSP factory, that is decrements it's reference counter, possibly really deleting the internal pointer.
  * Possibly also delete DSP pointers associated with this factory, if they were not explicitly deleted.
- * Beware : all kept factories and DSP pointers (in local variables...) thus become invalid.
+ * Beware: all kept factories and DSP pointers (in local variables...) thus become invalid.
  * 
  * @param factory - the DSP factory
  *
  * @return true if the factory internal pointer was really deleted, and false if only 'decremented'.
  */                                 
-bool deleteInterpreterDSPFactory(interpreter_dsp_factory* factory);
+LIBFAUST_API bool deleteInterpreterDSPFactory(interpreter_dsp_factory* factory);
 
 /**
  * Get the list of library dependancies of the Faust DSP factory.
@@ -163,17 +165,17 @@ bool deleteInterpreterDSPFactory(interpreter_dsp_factory* factory);
 DEPRECATED(std::vector<std::string> getInterpreterDSPFactoryLibraryList(interpreter_dsp_factory* factory));
 
 /**
- * Delete all Faust DSP factories kept in the library cache. Beware : all kept factory and DSP pointers (in local variables...) thus become invalid.
+ * Delete all Faust DSP factories kept in the library cache. Beware: all kept factory and DSP pointers (in local variables...) thus become invalid.
  * 
  */                                 
-void deleteAllInterpreterDSPFactories();
+LIBFAUST_API void deleteAllInterpreterDSPFactories();
 
 /**
  * Return Faust DSP factories of the library cache as a vector of their SHA keys.
  * 
  * @return the Faust DSP factories.
  */                                 
-std::vector<std::string> getAllInterpreterDSPFactories();
+LIBFAUST_API std::vector<std::string> getAllInterpreterDSPFactories();
 
 /**
  * Create a Faust DSP factory from a bitcode string. Note that the library keeps an internal cache of all
@@ -186,7 +188,7 @@ std::vector<std::string> getAllInterpreterDSPFactories();
  *
  * @return the DSP factory on success, otherwise a null pointer.
  */
-interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcode(const std::string& bitcode, std::string& error_msg);
+LIBFAUST_API interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcode(const std::string& bitcode, std::string& error_msg);
 
 /**
  * Write a Faust DSP factory into a bitcode string.
@@ -195,7 +197,7 @@ interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcode(const std::string&
  *
  * @return the bitcode as a string.
  */
-std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory);
+LIBFAUST_API std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory);
 
 /**
  * Create a Faust DSP factory from a bitcode file. Note that the library keeps an internal cache of all
@@ -208,7 +210,7 @@ std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory
  *
  * @return the DSP factory on success, otherwise a null pointer.
  */
-interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::string& bitcode_path, std::string& error_msg);
+LIBFAUST_API interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::string& bitcode_path, std::string& error_msg);
 
 /**
  * Write a Faust DSP factory into a bitcode file.
@@ -218,7 +220,7 @@ interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::str
  *
  * @return true if success, false otherwise.
  */
-bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bitcode_path);
+LIBFAUST_API bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bitcode_path);
 
 /*!
  @}

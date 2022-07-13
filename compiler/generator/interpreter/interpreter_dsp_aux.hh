@@ -30,9 +30,10 @@
 #include <sstream>
 #include <string>
 
+#include "faust/export.h"
+
 #include "dsp_aux.hh"
 #include "dsp_factory.hh"
-#include "export.hh"
 #include "interpreter_bytecode.hh"
 #include "fbc_interpreter.hh"
 
@@ -44,7 +45,7 @@ static inline void checkToken(const std::string& token, const std::string& expec
 class interpreter_dsp_factory;
 
 typedef class faust_smartptr<interpreter_dsp_factory> SDsp_factory;
-extern dsp_factory_table<SDsp_factory>                gInterpreterFactoryTable;
+extern dsp_factory_table<SDsp_factory> gInterpreterFactoryTable;
 
 template <class REAL, int TRACE>
 class interpreter_dsp_aux;
@@ -446,12 +447,17 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
         }
     }
 
-    void metadata(Meta* meta) { ExecuteMeta(fMetaBlock, meta); }
-
-    void ExecuteMeta(FIRMetaBlockInstruction* block, Meta* meta)
+    void metadata(Meta* meta)
     {
-        for (const auto& it : block->fInstructions) {
+        for (const auto& it : fMetaBlock->fInstructions) {
             meta->declare(it->fKey.c_str(), it->fValue.c_str());
+        }
+    }
+    
+    void metadata(MetaGlue* meta)
+    {
+        for (const auto& it : fMetaBlock->fInstructions) {
+            meta->declare(meta->metaInterface, it->fKey.c_str(), it->fValue.c_str());
         }
     }
 
@@ -459,13 +465,14 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
 };
 
 struct interpreter_dsp_base : public dsp {
+    
     virtual ~interpreter_dsp_base() {}
 
     // Not implemented...
     void buildUserInterface(UI* ui_interface) {}
 
     // Replaced by this one
-    virtual void buildUserInterface(UITemplate* glue) = 0;
+    virtual void buildUserInterface(UIInterface* glue) = 0;
 
     virtual void instanceInit(int sample_rate) {}
 
@@ -474,6 +481,10 @@ struct interpreter_dsp_base : public dsp {
     virtual void instanceResetUserInterface() {}
 
     virtual void instanceClear() {}
+    
+    virtual void metadata(Meta* meta) {}
+    
+    virtual void metadata(MetaGlue* meta) {}
 
     // Not implemented...
     virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs) {}
@@ -529,6 +540,8 @@ class interpreter_dsp_aux : public interpreter_dsp_base {
     }
 
     virtual void metadata(Meta* meta) { fFactory->metadata(meta); }
+    
+    virtual void metadata(MetaGlue* meta) { fFactory->metadata(meta); }
 
     virtual int getSampleRate() { return fFBCExecutor->getIntValue(fFactory->fSROffset); }
 
@@ -641,8 +654,8 @@ class interpreter_dsp_aux : public interpreter_dsp_base {
         // classInit is not called here since the tables are actually not shared between instances
         instanceInit(sample_rate);
     }
-
-    virtual void buildUserInterface(UITemplate* glue)
+    
+    virtual void buildUserInterface(UIInterface* glue)
     {
         try {
             fFBCExecutor->ExecuteBuildUserInterface(fFactory->fUserInterfaceBlock, glue);
@@ -749,7 +762,7 @@ class interpreter_dsp_aux : public interpreter_dsp_base {
 
 // Public C++ interface
 
-class EXPORT interpreter_dsp : public dsp {
+class LIBFAUST_API interpreter_dsp : public dsp {
    private:
     interpreter_dsp_factory* fFactory;
     interpreter_dsp_base*    fDSP;
@@ -821,7 +834,9 @@ class EXPORT interpreter_dsp : public dsp {
     int getNumOutputs();
 
     void buildUserInterface(UI* ui_interface);
-
+    
+    void buildUserInterface(UIGlue* glue);
+    
     int getSampleRate();
 
     void init(int sample_rate);
@@ -837,11 +852,13 @@ class EXPORT interpreter_dsp : public dsp {
     interpreter_dsp* clone();
 
     void metadata(Meta* meta);
+    
+    void metadata(MetaGlue* meta);
 
     void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs);
 };
 
-class EXPORT interpreter_dsp_factory : public dsp_factory, public faust_smartable {
+class LIBFAUST_API interpreter_dsp_factory : public dsp_factory, public faust_smartable {
    protected:
     dsp_factory_base* fFactory;
 
@@ -874,24 +891,52 @@ class EXPORT interpreter_dsp_factory : public dsp_factory, public faust_smartabl
     void write(std::ostream* out, bool binary = false, bool small = false) { fFactory->write(out, binary, small); }
 };
 
-EXPORT interpreter_dsp_factory* getInterpreterDSPFactoryFromSHAKey(const std::string& sha_key);
+LIBFAUST_API interpreter_dsp_factory* getInterpreterDSPFactoryFromSHAKey(const std::string& sha_key);
 
-EXPORT bool deleteInterpreterDSPFactory(interpreter_dsp_factory* factory);
+LIBFAUST_API bool deleteInterpreterDSPFactory(interpreter_dsp_factory* factory);
 
-EXPORT std::vector<std::string> getInterpreterDSPFactoryLibraryList(interpreter_dsp_factory* factory);
+LIBFAUST_API std::vector<std::string> getInterpreterDSPFactoryLibraryList(interpreter_dsp_factory* factory);
 
-EXPORT std::vector<std::string> getAllInterpreterDSPFactories();
+LIBFAUST_API std::vector<std::string> getAllInterpreterDSPFactories();
 
-EXPORT interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcode(const std::string& bitcode,
-                                                                     std::string&       error_msg);
+LIBFAUST_API interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcode(const std::string& bitcode,
+                                                                        std::string& error_msg);
 
-EXPORT std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory);
+LIBFAUST_API std::string writeInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory);
 
-EXPORT interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::string& bitcode_path,
-                                                                         std::string&       error_msg);
+LIBFAUST_API interpreter_dsp_factory* readInterpreterDSPFactoryFromBitcodeFile(const std::string& bitcode_path,
+                                                                            std::string& error_msg);
 
-EXPORT bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bitcode_path);
+LIBFAUST_API bool writeInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const std::string& bitcode_path);
 
-EXPORT void deleteAllInterpreterDSPFactories();
+LIBFAUST_API void deleteAllInterpreterDSPFactories();
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Public C interface
+
+LIBFAUST_API interpreter_dsp_factory* getCInterpreterDSPFactoryFromSHAKey(const char* sha_key);
+
+LIBFAUST_API bool deleteCInterpreterDSPFactory(interpreter_dsp_factory* factory);
+
+LIBFAUST_API const char** getCInterpreterDSPFactoryLibraryList(interpreter_dsp_factory* factory);
+
+LIBFAUST_API const char** getAllCInterpreterDSPFactories();
+
+LIBFAUST_API interpreter_dsp_factory* readCInterpreterDSPFactoryFromBitcode(const char* bitcode, char* error_msg);
+
+LIBFAUST_API char* writeCInterpreterDSPFactoryToBitcode(interpreter_dsp_factory* factory);
+
+LIBFAUST_API interpreter_dsp_factory* readCInterpreterDSPFactoryFromBitcodeFile(const char* bitcode_path, char* error_msg);
+
+LIBFAUST_API bool writeCInterpreterDSPFactoryToBitcodeFile(interpreter_dsp_factory* factory, const char* bitcode_path);
+
+LIBFAUST_API void deleteAllCInterpreterDSPFactories();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

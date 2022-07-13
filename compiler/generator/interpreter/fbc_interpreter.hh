@@ -153,7 +153,7 @@ class FBCInterpreter : public FBCExecutor<REAL> {
         {
             (*it)->write(&fMessage, false, false, false);  // Last param = false means no recursion in branches
             push(fMessage.str());
-            push("Stack [Int: " + std::to_string(int_value) + " ] [REAL: " + std::to_string(real_value) + " ]\n");
+            push("Stack [Int: " + std::to_string(int_value) + "] [REAL: " + std::to_string(real_value) + "]\n");
             fMessage.str("");
         }
     };
@@ -398,7 +398,7 @@ class FBCInterpreter : public FBCExecutor<REAL> {
                 std::cout << "assertLoadIntHeap array: fIntHeapSize ";
                 std::cout << fFactory->fIntHeapSize << " index " << (index - (*it)->fOffset1);
                 std::cout << " size " << size;
-                std::cout << " value " << fIntHeap[index];
+                if (index >= 0) std::cout << " value " << fIntHeap[index];
                 std::cout << " name " << (*it)->fName << std::endl;
             } else {
                 std::cout << "assertLoadIntHeap scalar: fIntHeapSize ";
@@ -426,7 +426,7 @@ class FBCInterpreter : public FBCExecutor<REAL> {
                 std::cout << "assertLoadRealHeap array: fRealHeapSize ";
                 std::cout << fFactory->fRealHeapSize << " index " << (index - (*it)->fOffset1);
                 std::cout << " size " << size;
-                std::cout << " value " << fRealHeap[index];
+                if (index >= 0) std::cout << " value " << fRealHeap[index];
                 std::cout << " name " << (*it)->fName << std::endl;
             } else {
                 std::cout << "assertLoadRealHeap scalar: fRealHeapSize ";
@@ -509,10 +509,10 @@ class FBCInterpreter : public FBCExecutor<REAL> {
         }
     }
 
-    void ExecuteBuildUserInterface(FIRUserInterfaceBlockInstruction<REAL>* block, UITemplate* glue)
+    void ExecuteBuildUserInterface(FIRUserInterfaceBlockInstruction<REAL>* block, UIInterface* glue)
     {
         // UI may have to be adapted if REAL and FAUSTFLOAT size do not match
-        bool need_proxy = (sizeof(REAL) == 8 && reinterpret_cast<UI*>(glue->fCPPInterface)->sizeOfFAUSTFLOAT() == 4);
+        bool need_proxy = sizeof(REAL) != glue->sizeOfFAUSTFLOAT();
         ZoneParam* cur_param = nullptr;
         
         for (const auto& it : block->fInstructions) {
@@ -2863,8 +2863,6 @@ class FBCInterpreter : public FBCExecutor<REAL> {
     do_kLoadIndexedReal : {
         int offset = popInt();
         if (TRACE > 0) {
-            // DEBUG
-            // assertIndex(it, offset, (*it)->fOffset2);
             pushReal(it, fRealHeap[assertLoadRealHeap(it, (*it)->fOffset1 + offset, (*it)->fOffset2)]);
         } else {
             pushReal(it, fRealHeap[(*it)->fOffset1 + offset]);

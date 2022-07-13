@@ -25,10 +25,11 @@ MIDI=false
 
 echoHelp ()
 {
-    echo "faust2audiokit [-midi] [-nvoices <num>] [additional Faust options (-vec -vs 8...)] <file.dsp>"
+    echo "faust2audiokit [-midi] [-nvoices <num>] [Faust options] <file.dsp>"
     option
     options -midi
     option "-nvoices <num>"
+    option "Faust options"
     echo ""
 }
 
@@ -81,7 +82,7 @@ for p in $FILE; do
     
     # compile faust to c++
     faust -uim -i -cn $dspName -a $ARCHFILE1 $OPTIONS $f -o "$SRCDIR/$dspName/FaustDSP.mm" || exit
-    faust -i -a $ARCHFILE2  $f -o "$SRCDIR/$dspName/faust2swift.cpp" || exit
+    faust -i -a $ARCHFILE2 $f -o "$SRCDIR/$dspName/faust2swift.cpp" || exit
     
     # for MIDI
     if [ $MIDI == true ]; then

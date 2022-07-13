@@ -51,20 +51,25 @@ dsp_factory_base* CPPCodeContainer::produceFactory()
         ((dynamic_cast<ostringstream*>(fOut)) ? dynamic_cast<ostringstream*>(fOut)->str() : ""), "");
 }
 
-CodeContainer* CPPCodeContainer::createScalarContainer(const string& name, int sub_container_type)
+CodeContainer* CPPCodeContainer::createScalarContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, ostream* dst, int sub_container_type)
 {
     if (gGlobal->gOneSample == 0) {
-        return new CPPScalarOneSampleCodeContainer1(name, "", 0, 1, fOut, sub_container_type);
+        return new CPPScalarOneSampleCodeContainer1(name,super, numInputs, numOutputs, dst, sub_container_type);
     } else if (gGlobal->gOneSample == 1) {
-        return new CPPScalarOneSampleCodeContainer2(name, "", 0, 1, fOut, sub_container_type);
+        return new CPPScalarOneSampleCodeContainer2(name, super, numInputs, numOutputs, dst, sub_container_type);
     } else if (gGlobal->gOneSample == 2) {
-        return new CPPScalarOneSampleCodeContainer3(name, "", 0, 1, fOut, sub_container_type);
+        return new CPPScalarOneSampleCodeContainer3(name, super, numInputs, numOutputs, dst, sub_container_type);
     } else if (gGlobal->gOneSample == 3) {
-        return new CPPScalarOneSampleCodeContainer4(name, "", 0, 1, fOut, sub_container_type);
+        return new CPPScalarOneSampleCodeContainer4(name, super, numInputs, numOutputs, dst, sub_container_type);
     } else {
-        return new CPPScalarCodeContainer(name, "", 0, 1, fOut, sub_container_type);
+        return new CPPScalarCodeContainer(name, super, numInputs, numOutputs, dst, sub_container_type);
     }
- }
+}
+
+CodeContainer* CPPCodeContainer::createScalarContainer(const string& name, int sub_container_type)
+{
+    return createScalarContainer(name, "", 0, 1, fOut, sub_container_type);
+}
 
 CodeContainer* CPPCodeContainer::createContainer(const string& name, const string& super, int numInputs, int numOutputs,
                                                  ostream* dst)
@@ -96,20 +101,20 @@ CodeContainer* CPPCodeContainer::createContainer(const string& name, const strin
     } else if (gGlobal->gVectorSwitch) {
         container = new CPPVectorCodeContainer(name, super, numInputs, numOutputs, dst);
     } else {
-        if (gGlobal->gOneSample == 0) {
-            container = new CPPScalarOneSampleCodeContainer1(name, super, numInputs, numOutputs, dst, kInt);
-        } else if (gGlobal->gOneSample == 1) {
-            container = new CPPScalarOneSampleCodeContainer2(name, super, numInputs, numOutputs, dst, kInt);
-        } else if (gGlobal->gOneSample == 2) {
-            container = new CPPScalarOneSampleCodeContainer3(name, super, numInputs, numOutputs, dst, kInt);
-        } else if (gGlobal->gOneSample == 3) {
-            container = new CPPScalarOneSampleCodeContainer4(name, super, numInputs, numOutputs, dst, kInt);
-        } else {
-            container = new CPPScalarCodeContainer(name, super, numInputs, numOutputs, dst, kInt);
-        }
+        container = createScalarContainer(name, super, numInputs, numOutputs, dst, kInt);
     }
 
     return container;
+}
+
+string CPPCodeContainer::genVirtual()
+{
+    return (gGlobal->gNoVirtual) ? "" : "virtual ";
+}
+
+string CPPCodeContainer::genFinal()
+{
+    return (gGlobal->gNoVirtual) ? " final" : "";
 }
 
 // Scalar
@@ -155,10 +160,10 @@ void CPPCodeContainer::produceInit(int tabs)
 {
     if (gGlobal->gMemoryManager) {
         tab(tabs, *fOut);
-        *fOut << "virtual void init(int sample_rate) {}";
+        *fOut << genVirtual() << "void init(int sample_rate) {}";
     } else {
         tab(tabs, *fOut);
-        *fOut << "virtual void init(int sample_rate) {";
+        *fOut << genVirtual() << "void init(int sample_rate) {";
         tab(tabs + 1, *fOut);
         *fOut << "classInit(sample_rate);";
         tab(tabs + 1, *fOut);
@@ -168,7 +173,7 @@ void CPPCodeContainer::produceInit(int tabs)
     }
 
     tab(tabs, *fOut);
-    *fOut << "virtual void instanceInit(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceInit(int sample_rate) {";
     tab(tabs + 1, *fOut);
     *fOut << "instanceConstants(sample_rate);";
     tab(tabs + 1, *fOut);
@@ -319,7 +324,7 @@ void CPPCodeContainer::produceClass()
     generateGlobalDeclarations(fCodeProducer);
     
     tab(n, *fOut);
-    *fOut << "class " << fKlassName << " : public " << fSuperKlassName << " {";
+    *fOut << "class " << fKlassName << genFinal() << " : public " << fSuperKlassName << " {";
     tab(n + 1, *fOut);
 
     if (gGlobal->gUIMacroSwitch) {
@@ -334,7 +339,14 @@ void CPPCodeContainer::produceClass()
     // Fields
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateDeclarations(fCodeProducer);
+    
+    // DSP fields as flat arrays are rewritten as pointers
+    if (gGlobal->gMemoryManager) {
+        ArrayToPointer array_pointer;
+        array_pointer.getCode(fDeclarationInstructions)->accept(fCodeProducer);
+    } else {
+        generateDeclarations(fCodeProducer);
+    }
 
     if (fAllocateInstructions->fCode.size() > 0) {
         tab(n + 1, *fOut);
@@ -390,7 +402,7 @@ void CPPCodeContainer::produceClass()
 
     tab(n + 1, *fOut);
     // No class name for main class
-    produceInfoFunctions(n + 1, "", "dsp", true, true, fCodeProducer);  // Inits
+    produceInfoFunctions(n + 1, "", "dsp", true, !gGlobal->gNoVirtual, fCodeProducer);  // Inits
 
     // TODO
     /*
@@ -447,7 +459,7 @@ void CPPCodeContainer::produceClass()
 
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstants(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceConstants(int sample_rate) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateInit(fCodeProducer);
@@ -456,7 +468,7 @@ void CPPCodeContainer::produceClass()
     tab(n + 1, *fOut);
 
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceResetUserInterface() {";
+    *fOut << genVirtual() << "void instanceResetUserInterface() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateResetUserInterface(fCodeProducer);
@@ -465,7 +477,7 @@ void CPPCodeContainer::produceClass()
     tab(n + 1, *fOut);
 
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceClear() {";
+    *fOut << genVirtual() << "void instanceClear() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateClear(fCodeProducer);
@@ -509,20 +521,24 @@ void CPPCodeContainer::produceClass()
 
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual " << fKlassName << "* clone() {";
+    *fOut << genVirtual() << fKlassName << "* clone() {";
     tab(n + 2, *fOut);
-    *fOut << "return new " << fKlassName << "();";
+    if (gGlobal->gMemoryManager) {
+        *fOut << "return create();";
+   } else {
+        *fOut << "return new " << fKlassName << "();";
+    }
     tab(n + 1, *fOut);
     *fOut << "}";
 
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateGetSampleRate("getSampleRate", "dsp", true, true)->accept(fCodeProducer);
+    generateGetSampleRate("getSampleRate", "dsp", true, !gGlobal->gNoVirtual)->accept(fCodeProducer);
 
     // User interface
     tab(n + 1, *fOut);
-    *fOut << "virtual void buildUserInterface(UI* ui_interface) {";
+    *fOut << genVirtual() << "void buildUserInterface(UI* ui_interface) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateUserInterface(fCodeProducer);
@@ -531,8 +547,99 @@ void CPPCodeContainer::produceClass()
 
     // Compute
     generateCompute(n);
-    tab(n, *fOut);
-    tab(n, *fOut);
+    
+    if (gGlobal->gMemoryManager) {
+        
+        // 'memoryInfo' method generation
+        tab(n + 1, *fOut);
+        tab(n + 1, *fOut);
+        *fOut << "static void memoryInfo() {";
+        tab(n + 2, *fOut);
+        
+        *fOut << "fManager->begin(" << fMemoryLayout.size() << ");";
+        tab(n + 2, *fOut);
+        
+        for (size_t i = 0; i < fMemoryLayout.size(); i++) {
+            // DSP or field name, type, size, sizeBytes, reads, wri
+            tuple<string, int, int, int, int, int> item = fMemoryLayout[i];
+            *fOut << "// " << get<0>(item);
+            tab(n + 2, *fOut);
+            *fOut << "fManager->info(" << get<3>(item) << ", " << get<4>(item) << ", " << get<5>(item) << ");";
+            tab(n + 2, *fOut);
+        }
+        
+        *fOut << "fManager->end();";
+        tab(n + 2, *fOut);
+        back(1, *fOut);
+        *fOut << "}";
+        
+        // memoryCreate
+        tab(n + 1, *fOut);
+        tab(n + 1, *fOut);
+        *fOut << "void memoryCreate() {";
+        tab(n + 2, *fOut);
+        for (size_t i = 0; i < fMemoryLayout.size(); i++) {
+            // DSP or field name, type, size, sizeBytes, reads, wri
+            tuple<string, int, int, int, int, int> item = fMemoryLayout[i];
+            if (get<2>(item) > 1) {
+                if (Typed::VarType(get<1>(item)) == Typed::kInt32) {
+                    *fOut << get<0>(item) << " = static_cast<int*>(fManager->allocate(" << get<3>(item) << "));";
+                } else {
+                    *fOut << get<0>(item) << " = static_cast<" << ifloat() << "*>(fManager->allocate(" << get<3>(item) << "));";
+                }
+                tab(n + 2, *fOut);
+            }
+        }
+        back(1, *fOut);
+        *fOut << "}";
+        
+        // memoryDestroy
+        tab(n + 1, *fOut);
+        tab(n + 1, *fOut);
+        *fOut << "void memoryDestroy() {";
+        tab(n + 2, *fOut);
+        for (size_t i = 0; i < fMemoryLayout.size(); i++) {
+            // DSP or field name, type, size, sizeBytes, reads, wri
+            tuple<string, int, int, int, int, int> item = fMemoryLayout[i];
+            if (get<2>(item) > 1) {
+                *fOut << "fManager->destroy(" << get<0>(item) << ");";
+                tab(n + 2, *fOut);
+            }
+        }
+        back(1, *fOut);
+        *fOut << "}";
+        tab(n, *fOut);
+        
+        // Static constructor
+        tab(n + 1, *fOut);
+        *fOut << "static " << fKlassName << "* create() {";
+        tab(n + 2, *fOut);
+        *fOut << fKlassName << "* dsp = new (fManager->allocate(sizeof(" << fKlassName << "))) " << fKlassName << "();";
+        tab(n + 2, *fOut);
+        *fOut << "dsp->memoryCreate();";
+        tab(n + 2, *fOut);
+        *fOut << "return dsp;";
+        tab(n + 1, *fOut);
+        *fOut << "}";
+        
+        // Static destructor
+        tab(n + 1, *fOut);
+        tab(n + 1, *fOut);
+        *fOut << "static void destroy(dsp* dsp) {";
+        tab(n + 2, *fOut);
+        *fOut << "static_cast<" << fKlassName << "*>(dsp)->memoryDestroy();";
+        tab(n + 2, *fOut);
+        *fOut << "fManager->destroy(dsp);";
+        tab(n + 1, *fOut);
+        *fOut << "}";
+    
+        tab(n, *fOut);
+        tab(n, *fOut);
+    } else {
+        tab(n, *fOut);
+        tab(n, *fOut);
+    }
+    
     *fOut << "};" << endl;
 
     // To improve (generalization for all backends...)
@@ -597,7 +704,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     
     tab(n, *fOut);
     fSuperKlassName = "one_sample_dsp";
-    *fOut << "class " << fKlassName << " : public " << fSuperKlassName << " {";
+    *fOut << "class " << fKlassName << genFinal() << " : public " << fSuperKlassName << " {";
     tab(n + 1, *fOut);
     
     if (gGlobal->gUIMacroSwitch) {
@@ -666,8 +773,8 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     *fOut << fKlassName << "() {}";
     tab(n + 1, *fOut);
-    *fOut << fKlassName << "(int* iControl, " << ifloat() <<"* fControl)";
-    *fOut << ":one_sample_dsp(iControl, fControl) {}";
+    *fOut << fKlassName << "(int* icontrol, " << ifloat() <<"* fcontrol)";
+    *fOut << ":one_sample_dsp(icontrol, fcontrol) {}";
     
     // Print metadata declaration
     tab(n + 1, *fOut);
@@ -675,12 +782,12 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     
     tab(n + 1, *fOut);
     // No class name for main class
-    produceInfoFunctions(n + 1, "", "dsp", true, true, fCodeProducer);  // Inits
+    produceInfoFunctions(n + 1, "", "dsp", true, !gGlobal->gNoVirtual, fCodeProducer);  // Inits
     
     // Dummy
     tab(n + 1, *fOut);
     *fOut << "static void classInit(int sample_rate) {}";
-    tab(n, *fOut);
+    tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
     *fOut << "void staticInit(int sample_rate) {";
@@ -706,7 +813,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
   
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstants(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceConstants(int sample_rate) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateInit(fCodeProducer);
@@ -715,7 +822,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceResetUserInterface() {";
+    *fOut << genVirtual() << "void instanceResetUserInterface() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateResetUserInterface(fCodeProducer);
@@ -724,7 +831,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceClear() {";
+    *fOut << genVirtual() << "void instanceClear() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateClear(fCodeProducer);
@@ -735,10 +842,10 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     // Init
     if (gGlobal->gMemoryManager) {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate) {}";
+        *fOut << genVirtual() << "void init(int sample_rate) {}";
     } else {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate) {";
+        *fOut << genVirtual() << "void init(int sample_rate) {";
         tab(n + 2, *fOut);
         *fOut << "instanceInit(sample_rate);";
         tab(n + 1, *fOut);
@@ -747,7 +854,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceInit(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceInit(int sample_rate) {";
     // staticInit has to be called for each instance since the tables are actually not shared between instances
     tab(n + 2, *fOut);
     *fOut << "staticInit(sample_rate);";
@@ -762,7 +869,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual " << fKlassName << "* clone() {";
+    *fOut << genVirtual() << fKlassName << "* clone() {";
     tab(n + 2, *fOut);
     *fOut << "return new " << fKlassName << "();";
     tab(n + 1, *fOut);
@@ -771,11 +878,11 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateGetSampleRate("getSampleRate", "dsp", true, true)->accept(fCodeProducer);
+    generateGetSampleRate("getSampleRate", "dsp", true, !gGlobal->gNoVirtual)->accept(fCodeProducer);
     
     // User interface
     tab(n + 1, *fOut);
-    *fOut << "virtual void buildUserInterface(UI* ui_interface) {";
+    *fOut << genVirtual() << "void buildUserInterface(UI* ui_interface) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateUserInterface(fCodeProducer);
@@ -784,7 +891,7 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << subst("virtual void control(int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
+    *fOut << genVirtual() << subst("void control(int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     // Generates local variables declaration and setup
@@ -793,9 +900,9 @@ void CPPScalarOneSampleCodeContainer1::produceClass()
     *fOut << "}" << endl;
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getNumIntControls() { return " << fInt32ControlNum << "; }";
+    *fOut << genVirtual() << "int getNumIntControls() { return " << fInt32ControlNum << "; }";
     tab(n + 1, *fOut);
-    *fOut << "virtual int getNumRealControls() { return " << fRealControlNum << "; }";
+    *fOut << genVirtual() << "int getNumRealControls() { return " << fRealControlNum << "; }";
     
     // Compute
     generateCompute(n);
@@ -860,7 +967,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     
     tab(n, *fOut);
     fSuperKlassName = "one_sample_dsp_real<" + string(ifloat()) + ">";
-    *fOut << "class " << fKlassName << " : public " << fSuperKlassName << " {";
+    *fOut << "class " << fKlassName << genFinal() << " : public " << fSuperKlassName << " {";
     tab(n + 1, *fOut);
     
     if (gGlobal->gUIMacroSwitch) {
@@ -933,8 +1040,8 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     *fOut << fKlassName << "() {}";
     tab(n + 1, *fOut);
-    *fOut << fKlassName << "(int* iControl, " <<  ifloat() << "* fControl, int* iZone, " << ifloat() << "* fZone)";
-    *fOut << ":one_sample_dsp_real(iControl, fControl, iZone, fZone) {}";
+    *fOut << fKlassName << "(int* icontrol, " <<  ifloat() << "* fcontrol, int* izone, " << ifloat() << "* fzone)";
+    *fOut << ":one_sample_dsp_real(icontrol, fcontrol, izone, fzone) {}";
     
     // Print metadata declaration
     tab(n + 1, *fOut);
@@ -942,7 +1049,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     
     tab(n + 1, *fOut);
     // No class name for main class
-    produceInfoFunctions(n + 1, "", "dsp", true, true, fCodeProducer);  // Inits
+    produceInfoFunctions(n + 1, "", "dsp", true, !gGlobal->gNoVirtual, fCodeProducer);  // Inits
     
     // Dummy
     tab(n + 1, *fOut);
@@ -974,7 +1081,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstants(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceConstants(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateInit(fCodeProducer);
@@ -983,7 +1090,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceResetUserInterface() {";
+    *fOut << genVirtual() << "void instanceResetUserInterface() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateResetUserInterface(fCodeProducer);
@@ -992,7 +1099,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceClear(" << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceClear(" << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateClear(fCodeProducer);
@@ -1003,10 +1110,10 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     // Init
     if (gGlobal->gMemoryManager) {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+        *fOut << genVirtual() << "void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     } else {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+        *fOut << genVirtual() << "void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
         tab(n + 2, *fOut);
         *fOut << "instanceInit(sample_rate, iZone, fZone);";
         tab(n + 1, *fOut);
@@ -1015,7 +1122,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceInit(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceInit(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     // staticInit has to be called for each instance since the tables are actually not shared between instances
     tab(n + 2, *fOut);
     *fOut << "staticInit(sample_rate, iZone, fZone);";
@@ -1030,7 +1137,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual " << fKlassName << "* clone() {";
+    *fOut << genVirtual() << fKlassName << "* clone() {";
     tab(n + 2, *fOut);
     *fOut << "return new " << fKlassName << "();";
     tab(n + 1, *fOut);
@@ -1039,11 +1146,11 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateGetSampleRate("getSampleRate", "dsp", true, true)->accept(fCodeProducer);
+    generateGetSampleRate("getSampleRate", "dsp", true, !gGlobal->gNoVirtual)->accept(fCodeProducer);
     
     // User interface
     tab(n + 1, *fOut);
-    *fOut << "virtual void buildUserInterface(UI* ui_interface) {";
+    *fOut << genVirtual() << "void buildUserInterface(UI* ui_interface) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateUserInterface(fCodeProducer);
@@ -1052,7 +1159,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << subst("virtual void control(int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
+    *fOut << genVirtual() << subst("void control(int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     // Generates local variables declaration and setup
@@ -1061,17 +1168,17 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     *fOut << "}" << endl;
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getNumIntControls() { return " << fInt32ControlNum << "; }";
+    *fOut << genVirtual() << "int getNumIntControls() { return " << fInt32ControlNum << "; }";
     tab(n + 1, *fOut);
     
-    *fOut << "virtual int getNumRealControls() { return " << fRealControlNum << "; }";
+    *fOut << genVirtual() << "int getNumRealControls() { return " << fRealControlNum << "; }";
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getiZoneSize() { return " << int_zone_size << "; }";
+    *fOut << genVirtual() << "int getiZoneSize() { return " << int_zone_size << "; }";
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getfZoneSize() { return " << real_zone_size << "; }";
+    *fOut << genVirtual() << "int getfZoneSize() { return " << real_zone_size << "; }";
     
     // Compute
     generateCompute(n);
@@ -1091,7 +1198,7 @@ void CPPScalarOneSampleCodeContainer2::produceClass()
     // To improve (generalization for all backends...)
     if (gGlobal->gMemoryManager) {
         tab(n, *fOut);
-        *fOut << "dsp_memory_manager* " << fKlassName << "::fManager = 0;" << endl;
+        *fOut << "dsp_memory_manager* " << fKlassName << "::fManager = nullptr;" << endl;
     }
     
     // Generate user interface macros if needed
@@ -1152,7 +1259,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     
     tab(n, *fOut);
     fSuperKlassName = "one_sample_dsp_real<" + string(ifloat()) + ">";
-    *fOut << "class " << fKlassName << " : public " << fSuperKlassName << " {";
+    *fOut << "class " << fKlassName << genFinal() << " : public " << fSuperKlassName << " {";
     tab(n + 1, *fOut);
     
     if (gGlobal->gUIMacroSwitch) {
@@ -1225,8 +1332,8 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     *fOut << fKlassName << "() {}";
     tab(n + 1, *fOut);
-    *fOut << fKlassName << "(int* iControl, " << ifloat() << "* fControl, int* iZone, " << ifloat() << "* fZone)";
-    *fOut << ":one_sample_dsp_real(iControl, fControl, iZone, fZone) {}";
+    *fOut << fKlassName << "(int* icontrol, " << ifloat() << "* fcontrol, int* izone, " << ifloat() << "* fzone)";
+    *fOut << ":one_sample_dsp_real(icontrol, fcontrol, izone, fzone) {}";
     
     // Print metadata declaration
     tab(n + 1, *fOut);
@@ -1234,7 +1341,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     
     tab(n + 1, *fOut);
     // No class name for main class
-    produceInfoFunctions(n + 1, "", "dsp", true, true, fCodeProducer);  // Inits
+    produceInfoFunctions(n + 1, "", "dsp", true, !gGlobal->gNoVirtual, fCodeProducer);  // Inits
     
     // Dummy
     tab(n + 1, *fOut);
@@ -1266,7 +1373,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstants(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceConstants(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateInit(fCodeProducer);
@@ -1275,7 +1382,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstantsFromMem(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceConstantsFromMem(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     ConstantsCopyFromMemory copy_from_mem(int_zone_size, real_zone_size);
     CPPInstVisitor visitor1(fOut, n + 2);
@@ -1285,7 +1392,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstantsToMem(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceConstantsToMem(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     ConstantsCopyToMemory copy_to_mem(int_zone_size, real_zone_size);
     CPPInstVisitor visitor2(fOut, n + 2);
@@ -1295,7 +1402,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceResetUserInterface() {";
+    *fOut << genVirtual() << "void instanceResetUserInterface() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateResetUserInterface(fCodeProducer);
@@ -1304,7 +1411,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceClear(" << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceClear(" << subst("int* iZone, $0* fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateClear(fCodeProducer);
@@ -1315,10 +1422,10 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     // Init
     if (gGlobal->gMemoryManager) {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+        *fOut << genVirtual() << "void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     } else {
         tab(n + 1, *fOut);
-        *fOut << "virtual void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+        *fOut << genVirtual() << "void init(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
         tab(n + 2, *fOut);
         *fOut << "instanceInit(sample_rate, iZone, fZone);";
         tab(n + 1, *fOut);
@@ -1327,7 +1434,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceInit(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
+    *fOut << genVirtual() << "void instanceInit(int sample_rate, " << subst("int* iZone, $0* fZone) {", ifloat());
     // staticInit has to be called for each instance since the tables are actually not shared between instances
     tab(n + 2, *fOut);
     *fOut << "staticInit(sample_rate, iZone, fZone);";
@@ -1344,7 +1451,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual " << fKlassName << "* clone() {";
+    *fOut << genVirtual() << fKlassName << "* clone() {";
     tab(n + 2, *fOut);
     *fOut << "return new " << fKlassName << "();";
     tab(n + 1, *fOut);
@@ -1353,11 +1460,11 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateGetSampleRate("getSampleRate", "dsp", true, true)->accept(fCodeProducer);
+    generateGetSampleRate("getSampleRate", "dsp", true, !gGlobal->gNoVirtual)->accept(fCodeProducer);
     
     // User interface
     tab(n + 1, *fOut);
-    *fOut << "virtual void buildUserInterface(UI* ui_interface) {";
+    *fOut << genVirtual() << "void buildUserInterface(UI* ui_interface) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateUserInterface(fCodeProducer);
@@ -1366,7 +1473,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << subst("virtual void control(int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
+    *fOut << genVirtual() << subst("void control(int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     // Generates local variables declaration and setup
@@ -1375,17 +1482,17 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     *fOut << "}" << endl;
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getNumIntControls() { return " << fInt32ControlNum << "; }";
+    *fOut << genVirtual() << "int getNumIntControls() { return " << fInt32ControlNum << "; }";
     tab(n + 1, *fOut);
     
-    *fOut << "virtual int getNumRealControls() { return " << fRealControlNum << "; }";
+    *fOut << genVirtual() << "int getNumRealControls() { return " << fRealControlNum << "; }";
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getiZoneSize() { return " << copy_from_mem.fIntIndex  << "; }";
+    *fOut << genVirtual() << "int getiZoneSize() { return " << copy_from_mem.fIntIndex  << "; }";
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getfZoneSize() { return " << copy_from_mem.fRealIndex << "; }";
+    *fOut << genVirtual() << "int getfZoneSize() { return " << copy_from_mem.fRealIndex << "; }";
     
     // Compute
     generateCompute(n);
@@ -1406,7 +1513,7 @@ void CPPScalarOneSampleCodeContainer3::produceClass()
     // To improve (generalization for all backends...)
     if (gGlobal->gMemoryManager) {
         tab(n, *fOut);
-        *fOut << "dsp_memory_manager* " << fKlassName << "::fManager = 0;" << endl;
+        *fOut << "dsp_memory_manager* " << fKlassName << "::fManager = nullptr;" << endl;
     }
     
     // Generate user interface macros if needed
@@ -1467,7 +1574,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     
     tab(n, *fOut);
     fSuperKlassName = "one_sample_dsp_real1<" + string(ifloat()) + ">";
-    *fOut << "class " << fKlassName << " : public " << fSuperKlassName << " {";
+    *fOut << "class " << fKlassName << genFinal() << " : public " << fSuperKlassName << " {";
     tab(n + 1, *fOut);
     
     if (gGlobal->gUIMacroSwitch) {
@@ -1547,7 +1654,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     
     tab(n + 1, *fOut);
     // No class name for main class
-    produceInfoFunctions(n + 1, "", "dsp", true, true, fCodeProducer);  // Inits
+    produceInfoFunctions(n + 1, "", "dsp", true, !gGlobal->gNoVirtual, fCodeProducer);  // Inits
     
     // Dummy
     tab(n + 1, *fOut);
@@ -1580,7 +1687,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstants(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceConstants(int sample_rate) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateInit(fCodeProducer);
@@ -1589,7 +1696,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstantsFromMem(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceConstantsFromMem(int sample_rate) {";
     tab(n + 2, *fOut);
     ConstantsCopyFromMemory1 copy_from_mem(int_zone_size, real_zone_size);
     CPPInstVisitor visitor1(fOut, n + 2);
@@ -1599,7 +1706,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceConstantsToMem(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceConstantsToMem(int sample_rate) {";
     tab(n + 2, *fOut);
     ConstantsCopyToMemory1 copy_to_mem(int_zone_size, real_zone_size);
     CPPInstVisitor visitor2(fOut, n + 2);
@@ -1612,7 +1719,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceResetUserInterface() {";
+    *fOut << genVirtual() << "void instanceResetUserInterface() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateResetUserInterface(fCodeProducer);
@@ -1621,7 +1728,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceClear() {";
+    *fOut << genVirtual() << "void instanceClear() {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateClear(fCodeProducer);
@@ -1645,7 +1752,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     */
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void init(int sample_rate) {";
+    *fOut << genVirtual() << "void init(int sample_rate) {";
     tab(n + 2, *fOut);
     *fOut << "instanceInit(sample_rate);";
     tab(n + 1, *fOut);
@@ -1653,7 +1760,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual void instanceInit(int sample_rate) {";
+    *fOut << genVirtual() << "void instanceInit(int sample_rate) {";
     // staticInit has to be called for each instance since the tables are actually not shared between instances
     tab(n + 2, *fOut);
     *fOut << "staticInit(sample_rate);";
@@ -1670,7 +1777,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual " << fKlassName << "* clone() {";
+    *fOut << genVirtual() << fKlassName << "* clone() {";
     tab(n + 2, *fOut);
     if (gGlobal->gMemoryManager) {
         *fOut << "return new " << fKlassName << "();";
@@ -1684,11 +1791,11 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     tab(n + 1, *fOut);
-    generateGetSampleRate("getSampleRate", "dsp", true, true)->accept(fCodeProducer);
+    generateGetSampleRate("getSampleRate", "dsp", true, !gGlobal->gNoVirtual)->accept(fCodeProducer);
     
     // User interface
     tab(n + 1, *fOut);
-    *fOut << "virtual void buildUserInterface(UI* ui_interface) {";
+    *fOut << genVirtual() << "void buildUserInterface(UI* ui_interface) {";
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     generateUserInterface(fCodeProducer);
@@ -1697,7 +1804,7 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << subst("virtual void control() {", xfloat(), ifloat());
+    *fOut << genVirtual() << subst("void control() {", xfloat(), ifloat());
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
     // Generates local variables declaration and setup
@@ -1706,17 +1813,17 @@ void CPPScalarOneSampleCodeContainer4::produceClass()
     *fOut << "}" << endl;
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getNumIntControls() { return " << fInt32ControlNum << "; }";
+    *fOut << genVirtual() << "int getNumIntControls() { return " << fInt32ControlNum << "; }";
     tab(n + 1, *fOut);
     
-    *fOut << "virtual int getNumRealControls() { return " << fRealControlNum << "; }";
+    *fOut << genVirtual() << "int getNumRealControls() { return " << fRealControlNum << "; }";
     tab(n + 1, *fOut);
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getiZoneSize() { return " << int_zone_size  << "; }";
+    *fOut << genVirtual() << "int getiZoneSize() { return " << int_zone_size  << "; }";
     
     tab(n + 1, *fOut);
-    *fOut << "virtual int getfZoneSize() { return " << real_zone_size << "; }";
+    *fOut << genVirtual() << "int getfZoneSize() { return " << real_zone_size << "; }";
     
     // Compute
     generateCompute(n);
@@ -1806,9 +1913,9 @@ void CPPScalarCodeContainer::generateCompute(int n)
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
     } else {
-        *fOut << subst("virtual void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -1837,9 +1944,9 @@ void CPPScalarOneSampleCodeContainer1::generateCompute(int n)
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute($0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
+        *fOut << genVirtual() << subst("void compute($0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
     } else {
-        *fOut << subst("virtual void compute($0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
+        *fOut << genVirtual() << subst("void compute($0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", ifloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -1865,9 +1972,9 @@ void CPPScalarOneSampleCodeContainer2::generateCompute(int n)
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute($0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
+        *fOut << genVirtual() << subst("void compute($0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
     } else {
-        *fOut << subst("virtual void compute($0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
+        *fOut << genVirtual() << subst("void compute($0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", ifloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -1893,9 +2000,9 @@ void CPPScalarOneSampleCodeContainer4::generateCompute(int n)
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute($0* inputs, $0* outputs) {", xfloat());
+        *fOut << genVirtual() << subst("void compute($0* inputs, $0* outputs) {", xfloat());
     } else {
-        *fOut << subst("virtual void compute($0* RESTRICT inputs, $0* RESTRICT outputs) {", xfloat());
+        *fOut << genVirtual() << subst("void compute($0* RESTRICT inputs, $0* RESTRICT outputs) {", xfloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -1912,32 +2019,6 @@ void CPPScalarOneSampleCodeContainer4::generateCompute(int n)
     
     back(1, *fOut);
     *fOut << "}";
-    
-    // TODO
-    /*
-    // Generates declaration (standard version)
-    tab(n + 1, *fOut);
-    tab(n + 1, *fOut);
-    if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
-    } else {
-        *fOut << subst("virtual void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
-    }
-    tab(n + 2, *fOut);
-    fCodeProducer->Tab(n + 2);
-    
-    // Generates one single scalar loop
-    ForLoopInst* loop = fCurLoop->generateScalarLoop(fFullCount);
-    loop->accept(fCodeProducer);
-    
-    // TODO : atomic switch
-    // Currently for soundfile management
-    
-    generatePostComputeBlock(fCodeProducer);
-    
-    back(1, *fOut);
-    *fOut << "}";
-    */
 }
 
 // Vector
@@ -1957,9 +2038,9 @@ void CPPVectorCodeContainer::generateCompute(int n)
     // Generates declaration
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
     } else {
-        *fOut << subst("virtual void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -1991,9 +2072,9 @@ void CPPOpenMPCodeContainer::generateCompute(int n)
     // Generates declaration
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
     } else {
-        *fOut << subst("virtual void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);
@@ -2040,9 +2121,9 @@ void CPPWorkStealingCodeContainer::generateCompute(int n)
     // Generates declaration
     tab(n + 1, *fOut);
     if (gGlobal->gInPlace) {
-        *fOut << subst("virtual void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
     } else {
-        *fOut << subst("virtual void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
+        *fOut << genVirtual() << subst("void compute(int $0, $1** RESTRICT inputs, $1** RESTRICT outputs) {", fFullCount, xfloat());
     }
     tab(n + 2, *fOut);
     fCodeProducer->Tab(n + 2);

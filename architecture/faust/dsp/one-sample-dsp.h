@@ -1,26 +1,26 @@
-/************************** BEGIN one-sample-dsp.h **************************/
-/************************************************************************
- FAUST Architecture File
- Copyright (C) 2019 GRAME, Centre National de Creation Musicale
- ---------------------------------------------------------------------
- This Architecture section is free software; you can redistribute it
- and/or modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 3 of
- the License, or (at your option) any later version.
- 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
- 
- You should have received a copy of the GNU General Public License
- along with this program; If not, see <http://www.gnu.org/licenses/>.
- 
- EXCEPTION : As a special exception, you may create a larger work
- that contains this FAUST architecture section and distribute
- that work under terms of your choice, so long as this FAUST
- architecture section is not modified.
- ************************************************************************/
+/************************** BEGIN one-sample-dsp.h ************************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+***************************************************************************/
 
 #ifndef __one_sample_dsp__
 #define __one_sample_dsp__
@@ -28,7 +28,7 @@
 #include <assert.h>
 #include "faust/dsp/dsp.h"
 
-class one_sample_dsp : public dsp {
+class FAUST_API one_sample_dsp : public dsp {
   
     protected:
         
@@ -162,7 +162,7 @@ class one_sample_dsp : public dsp {
 // To be used with -os1 and -os2 mode
 
 template <typename REAL>
-class one_sample_dsp_real : public dsp {
+class FAUST_API one_sample_dsp_real : public dsp {
     
     protected:
     
@@ -363,7 +363,7 @@ class one_sample_dsp_real : public dsp {
 // To be used with -os3 mode
 
 template <typename REAL>
-class one_sample_dsp_real1 : public dsp {
+class FAUST_API one_sample_dsp_real1 : public dsp {
     
     protected:
         

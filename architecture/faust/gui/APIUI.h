@@ -1,26 +1,26 @@
-/************************** BEGIN APIUI.h **************************/
-/************************************************************************
- FAUST Architecture File
- Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
- ---------------------------------------------------------------------
- This Architecture section is free software; you can redistribute it
- and/or modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 3 of
- the License, or (at your option) any later version.
+/************************** BEGIN APIUI.h *****************************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
 
- You should have received a copy of the GNU General Public License
- along with this program; If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
- EXCEPTION : As a special exception, you may create a larger work
- that contains this FAUST architecture section and distribute
- that work under terms of your choice, so long as this FAUST
- architecture section is not modified.
- ************************************************************************/
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+************************************************************************/
 
 #ifndef API_UI_H
 #define API_UI_H
@@ -49,8 +49,9 @@ class APIUI : public PathBuilder, public Meta, public UI
         enum Mapping { kLin = 0, kLog = 1, kExp = 2 };
 
         struct Item {
-            std::string fPath;
             std::string fLabel;
+            std::string fShortname;
+            std::string fPath;
             ValueConverter* fConversion;
             FAUSTFLOAT* fZone;
             FAUSTFLOAT fInit;
@@ -58,6 +59,20 @@ class APIUI : public PathBuilder, public Meta, public UI
             FAUSTFLOAT fMax;
             FAUSTFLOAT fStep;
             ItemType fItemType;
+            
+            Item(const std::string& label,
+                 const std::string& short_name,
+                 const std::string& path,
+                 ValueConverter* conversion,
+                 FAUSTFLOAT* zone,
+                 FAUSTFLOAT init,
+                 FAUSTFLOAT min,
+                 FAUSTFLOAT max,
+                 FAUSTFLOAT step,
+                 ItemType item_type)
+            :fLabel(label), fShortname(short_name), fPath(path), fConversion(conversion),
+            fZone(zone), fInit(init), fMin(min), fMax(max), fStep(step), fItemType(item_type)
+            {}
         };
         std::vector<Item> fItems;
 
@@ -91,6 +106,7 @@ class APIUI : public PathBuilder, public Meta, public UI
                                   ItemType type)
         {
             std::string path = buildPath(label);
+            fFullPaths.push_back(path);
 
             // handle scale metadata
             ValueConverter* converter = nullptr;
@@ -107,7 +123,7 @@ class APIUI : public PathBuilder, public Meta, public UI
             }
             fCurrentScale = kLin;
 
-            fItems.push_back({path, label, converter, zone, init, min, max, step, type });
+            fItems.push_back(Item(label, "", path, converter, zone, init, min, max, step, type));
        
             if (fCurrentAcc.size() > 0 && fCurrentGyr.size() > 0) {
                 fprintf(stderr, "warning : 'acc' and 'gyr' metadata used for the same %s parameter !!\n", label);
@@ -260,7 +276,18 @@ class APIUI : public PathBuilder, public Meta, public UI
         virtual void openTabBox(const char* label) { pushLabel(label); }
         virtual void openHorizontalBox(const char* label) { pushLabel(label); }
         virtual void openVerticalBox(const char* label) { pushLabel(label); }
-        virtual void closeBox() { popLabel(); }
+        virtual void closeBox()
+        {
+            if (popLabel()) {
+                // Shortnames can be computed when all fullnames are known
+                computeShortNames();
+                // Fill 'shortname' field for each item
+                for (const auto& it : fFull2Short) {
+                    int index = getParamIndex(it.first.c_str());
+                    fItems[index].fShortname = it.second;
+                }
+            }
+        }
 
         // -- active widgets
 
@@ -341,22 +368,18 @@ class APIUI : public PathBuilder, public Meta, public UI
         //-------------------------------------------------------------------------------
         int getParamsCount() { return int(fItems.size()); }
 
-        int getParamIndex(const char* path)
+        int getParamIndex(const char* path_aux)
         {
-            auto it1 = find_if(fItems.begin(), fItems.end(), [=](const Item& it) { return it.fPath == std::string(path); });
-            if (it1 != fItems.end()) {
-                return int(it1 - fItems.begin());
-            }
-
-            auto it2 = find_if(fItems.begin(), fItems.end(), [=](const Item& it) { return it.fLabel == std::string(path); });
-            if (it2 != fItems.end()) {
-                return int(it2 - fItems.begin());
-            }
-
-            return -1;
+            std::string path = std::string(path_aux);
+            auto it = find_if(fItems.begin(), fItems.end(),
+                              [=](const Item& it) { return (it.fLabel == path) || (it.fShortname == path) || (it.fPath == path); });
+            return (it != fItems.end()) ? int(it - fItems.begin()) : -1;
         }
-        const char* getParamAddress(int p) { return fItems[uint(p)].fPath.c_str(); }
+    
         const char* getParamLabel(int p) { return fItems[uint(p)].fLabel.c_str(); }
+        const char* getParamShortname(int p) { return fItems[uint(p)].fShortname.c_str(); }
+        const char* getParamAddress(int p) { return fItems[uint(p)].fPath.c_str(); }
+    
         std::map<const char*, const char*> getMetadata(int p)
         {
             std::map<const char*, const char*> res;
@@ -382,7 +405,12 @@ class APIUI : public PathBuilder, public Meta, public UI
         FAUSTFLOAT getParamValue(const char* path)
         {
             int index = getParamIndex(path);
-            return (index >= 0) ? getParamValue(index) : FAUSTFLOAT(0);
+            if (index >= 0) {
+                return getParamValue(index);
+            } else {
+                fprintf(stderr, "getParamValue : '%s' not found\n", (path == nullptr ? "NULL" : path));
+                return FAUSTFLOAT(0);
+            }
         }
 
         void setParamValue(int p, FAUSTFLOAT v) { *fItems[uint(p)].fZone = v; }
@@ -471,7 +499,7 @@ class APIUI : public PathBuilder, public Meta, public UI
          * Used to edit gyroscope curves and mapping. Set curve and related mapping for a given UI parameter.
          *
          * @param p - the UI parameter index
-         * @param acc - 0 for X gyroscope, 1 for Y gyroscope, 2 for Z gyroscope (-1 means "no mapping")
+         * @param gyr - 0 for X gyroscope, 1 for Y gyroscope, 2 for Z gyroscope (-1 means "no mapping")
          * @param curve - between 0 and 3
          * @param amin - mapping 'min' point
          * @param amid - mapping 'middle' point

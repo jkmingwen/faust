@@ -29,6 +29,7 @@
 #include "recursivness.hh"
 #include "text_instructions.hh"
 #include "type_manager.hh"
+#include "struct_manager.hh"
 
 using namespace std;
 
@@ -197,15 +198,12 @@ void CodeContainer::printLibrary(ostream& fout)
  */
 void CodeContainer::printIncludeFile(ostream& fout)
 {
-    set<string>           S;
-    set<string>::iterator f;
-
+    set<string> S;
     collectIncludeFile(S);
-    for (f = S.begin(); f != S.end(); f++) {
-        string inc = *f;
+    for (const auto& inc : S) {
         // Only print non-empty include (inc is actually quoted)
         if (inc.size() > 2) {
-            fout << "#include " << *f << "\n";
+            fout << "#include " << inc << "\n";
         }
     }
 }
@@ -272,9 +270,9 @@ void CodeContainer::computeForwardDAG(lclgraph dag, int& loop_count, vector<int>
 }
 
 ValueInst* CodeContainer::pushFunction(const string& name, Typed::VarType result, vector<Typed::VarType>& types,
-                                       const list<ValueInst*>& args)
+                                       const Values& args)
 {
-    list<NamedTyped*> named_args;
+    Names named_args;
     for (size_t i = 0; i < types.size(); i++) {
         named_args.push_back(InstBuilder::genNamedTyped("dummy" + to_string(i), InstBuilder::genBasicTyped(types[i])));
     }
@@ -376,6 +374,117 @@ void CodeContainer::processFIR(void)
         set<CodeLoop*> visited;
         CodeLoop::groupSeqLoops(fCurLoop, visited);
     }
+ 
+    /*
+        Create memory layout, to be used in C++ backend and JSON generation.
+        The description order follows what will be done at allocation time.
+     
+        // Create static tables
+        mydsp::classInit();
+     
+        // Create DSP
+        dsp* DSP = mydsp::create();
+     
+        // Init DSP
+        DSP->instanceInit(44100);
+     */
+    if (gGlobal->gMemoryManager) {
+        {
+            // Compute DSP struct arrays size
+            StructInstVisitor struct_visitor;
+        
+            // Add the global static tables
+            fGlobalDeclarationInstructions->accept(&struct_visitor);
+        
+            // Compute R/W access for each subcontainer
+            ForLoopInst* loop = fCurLoop->generateScalarLoop("count");
+            loop->accept(&struct_visitor);
+            
+            // Subcontainers used in classInit
+            for (const auto& it : fSubContainers) {
+                // Check that the subcontainer name appears as a type name in fStaticInitInstructions
+                SearchSubcontainer search_class(it->getClassName());
+                fStaticInitInstructions->accept(&search_class);
+                if (search_class.fFound) {
+                    // Subcontainer size
+                    VariableSizeCounter struct_size(Address::kStruct);
+                    it->generateDeclarations(&struct_size);
+                    fMemoryLayout.push_back(make_tuple(it->getClassName(), int(Typed::kNoType), 0, struct_size.fSizeBytes, 0, 0));
+                    
+                    // Get the associated table size and access
+                    pair<string, int> field = gGlobal->gTablesSize[it->getClassName()];
+                    
+                    // Check the table name memory description
+                    MemoryDesc& decs = struct_visitor.getMemoryDesc(field.first);
+                    fMemoryLayout.push_back(make_tuple(field.first, int(Typed::kNoType), 0, field.second, decs.fRAccessCount, 0));
+                }
+            }
+        }
+        
+        {
+            // Compute DSP struct arrays size and R/W access
+            StructInstVisitor struct_visitor;
+        
+            // Add the DSP fields
+            fDeclarationInstructions->accept(&struct_visitor);
+            
+            // To generate R/W access in the DSP loop
+            ForLoopInst* loop = fCurLoop->generateScalarLoop("count");
+            loop->accept(&struct_visitor);
+            
+            // DSP object
+            int read_access = 0;
+            int write_access = 0;
+            for (const auto& it : struct_visitor.getFieldTable()) {
+                // Scalar types are kept in the DSP
+                if (it.second.fSize == 1) {
+                    read_access += it.second.fRAccessCount;
+                    write_access += it.second.fWAccessCount;
+                }
+            }
+            
+            // Array fields are transformed in pointers
+            ArrayToPointer array_pointer;
+            VariableSizeCounter struct_size(Address::kStruct);
+            array_pointer.getCode(fDeclarationInstructions)->accept(&struct_size);
+            fMemoryLayout.push_back(make_tuple(fKlassName,
+                                                int(Typed::kNoType),
+                                                0,
+                                                // Upper value : add virtual method pointer (8 bytes in 64 bits)
+                                                // + 8 bytes for memory alignment
+                                                struct_size.fSizeBytes + 8 + 8,
+                                                read_access,
+                                                write_access));
+            
+            // Arrays inside the DSP object
+            for (const auto& it : struct_visitor.getFieldTable()) {
+                // Arrays have size > 1
+                if (it.second.fSize > 1) {
+                    fMemoryLayout.push_back(make_tuple(it.first,
+                                                        int(it.second.fType),
+                                                        it.second.fSize,
+                                                        it.second.fSizeBytes,
+                                                        it.second.fRAccessCount,
+                                                        it.second.fWAccessCount));
+                }
+            }
+            
+            // Subcontainers used in instanceConstants
+            for (const auto& it : fSubContainers) {
+                // Check that the subcontainer name appears as a type name in fInitInstructions
+                SearchSubcontainer search_class(it->getClassName());
+                fInitInstructions->accept(&search_class);
+                if (search_class.fFound) {
+                    VariableSizeCounter struct_size(Address::kStruct);
+                    it->generateDeclarations(&struct_size);
+                    fMemoryLayout.push_back(make_tuple(it->getClassName(), int(Typed::kNoType), 0, struct_size.fSizeBytes, 0, 0));
+                }
+            }
+        }
+    }
+    
+    // Possibly generate JSON
+    generateJSONFile();
 
     // Sort struct fields by size and type
     // 05/16/17 : deactivated since it slows down the code...
@@ -470,6 +579,8 @@ void CodeContainer::printMacros(ostream& fout, int n)
             tab(n + 1, fout);
             fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
             tab(n + 1, fout);
+            fout << "#define FAUST_COMPILATION_OPIONS \"" << gGlobal->printCompilationOptions1() << "\"";
+            tab(n + 1, fout);
             fout << "#define FAUST_INPUTS " << fNumInputs;
             tab(n + 1, fout);
             fout << "#define FAUST_OUTPUTS " << fNumOutputs;
@@ -514,7 +625,7 @@ void CodeContainer::printMacros(ostream& fout, int n)
 DeclareFunInst* CodeContainer::generateGetIO(const string& name, const string& obj, int io, bool ismethod,
                                              bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -539,7 +650,7 @@ DeclareFunInst* CodeContainer::generateGetOutputs(const string& name, const stri
 
 DeclareFunInst* CodeContainer::generateAllocate(const string& name, const string& obj, bool ismethod, bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -556,7 +667,7 @@ DeclareFunInst* CodeContainer::generateAllocate(const string& name, const string
 
 DeclareFunInst* CodeContainer::generateDestroy(const string& name, const string& obj, bool ismethod, bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -574,7 +685,7 @@ DeclareFunInst* CodeContainer::generateDestroy(const string& name, const string&
 DeclareFunInst* CodeContainer::generateGetIORate(const string& name, const string& obj, vector<int>& io, bool ismethod,
                                                  bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -613,7 +724,7 @@ DeclareFunInst* CodeContainer::generateGetIORate(const string& name, const strin
 DeclareFunInst* CodeContainer::generateInstanceClear(const string& name, const string& obj, bool ismethod,
                                                      bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -629,9 +740,9 @@ DeclareFunInst* CodeContainer::generateInstanceClear(const string& name, const s
 }
 
 DeclareFunInst* CodeContainer::generateInstanceConstants(const string& name, const string& obj, bool ismethod,
-                                                         bool isvirtual)
+                                                        bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -649,7 +760,7 @@ DeclareFunInst* CodeContainer::generateInstanceConstants(const string& name, con
 
 DeclareFunInst* CodeContainer::generateStaticInitFun(const string& name, bool isstatic)
 {
-    list<NamedTyped*> args;
+    Names args;
     args.push_back(InstBuilder::genNamedTyped("sample_rate", Typed::kInt32));
 
     BlockInst* block = InstBuilder::genBlockInst();
@@ -674,7 +785,7 @@ DeclareFunInst* CodeContainer::generateStaticInitFun(const string& name, bool is
 DeclareFunInst* CodeContainer::generateInstanceInitFun(const string& name, const string& obj, bool ismethod,
                                                        bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -695,7 +806,7 @@ DeclareFunInst* CodeContainer::generateInstanceInitFun(const string& name, const
 
 DeclareFunInst* CodeContainer::generateFillFun(const string& name, const string& obj, bool ismethod, bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -724,7 +835,7 @@ DeclareFunInst* CodeContainer::generateFillFun(const string& name, const string&
 
 DeclareFunInst* CodeContainer::generateInit(const string& name, const string& obj, bool ismethod, bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -732,7 +843,7 @@ DeclareFunInst* CodeContainer::generateInit(const string& name, const string& ob
 
     BlockInst* block = InstBuilder::genBlockInst();
     {
-        list<ValueInst*> args1;
+        Values args1;
         if (!ismethod) {
             args1.push_back(InstBuilder::genLoadFunArgsVar(obj));
         }
@@ -741,7 +852,7 @@ DeclareFunInst* CodeContainer::generateInit(const string& name, const string& ob
     }
 
     {
-        list<ValueInst*> args1;
+        Values args1;
         if (!ismethod) {
             args1.push_back(InstBuilder::genLoadFunArgsVar(obj));
         }
@@ -756,7 +867,7 @@ DeclareFunInst* CodeContainer::generateInit(const string& name, const string& ob
 DeclareFunInst* CodeContainer::generateInstanceInit(const string& name, const string& obj, bool ismethod,
                                                     bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -764,7 +875,7 @@ DeclareFunInst* CodeContainer::generateInstanceInit(const string& name, const st
 
     BlockInst* block = InstBuilder::genBlockInst();
     {
-        list<ValueInst*> args1;
+        Values args1;
         if (!ismethod) {
             args1.push_back(InstBuilder::genLoadFunArgsVar(obj));
         }
@@ -773,7 +884,7 @@ DeclareFunInst* CodeContainer::generateInstanceInit(const string& name, const st
     }
 
     {
-        list<ValueInst*> args1;
+        Values args1;
         if (!ismethod) {
             args1.push_back(InstBuilder::genLoadFunArgsVar(obj));
         }
@@ -781,7 +892,7 @@ DeclareFunInst* CodeContainer::generateInstanceInit(const string& name, const st
     }
 
     {
-        list<ValueInst*> args1;
+        Values args1;
         if (!ismethod) {
             args1.push_back(InstBuilder::genLoadFunArgsVar(obj));
         }
@@ -795,7 +906,7 @@ DeclareFunInst* CodeContainer::generateInstanceInit(const string& name, const st
 DeclareFunInst* CodeContainer::generateGetSampleRate(const string& name, const string& obj, bool ismethod,
                                                      bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -811,7 +922,7 @@ DeclareFunInst* CodeContainer::generateGetSampleRate(const string& name, const s
 
 DeclareFunInst* CodeContainer::generateComputeFun(const string& name, const string& obj, bool ismethod, bool isvirtual)
 {
-    list<NamedTyped*> args;
+    Names args;
     if (!ismethod) {
         args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
     }
@@ -833,7 +944,7 @@ DeclareFunInst* CodeContainer::generateComputeFun(const string& name, const stri
 
 DeclareFunInst* CodeContainer::generateCalloc()
 {
-    list<NamedTyped*> args;
+    Names args;
     args.push_back(InstBuilder::genNamedTyped("count", Typed::kInt64));
     args.push_back(InstBuilder::genNamedTyped("size", Typed::kInt64));
 
@@ -845,7 +956,7 @@ DeclareFunInst* CodeContainer::generateCalloc()
 
 DeclareFunInst* CodeContainer::generateFree()
 {
-    list<NamedTyped*> args;
+    Names args;
     args.push_back(InstBuilder::genNamedTyped("ptr", Typed::kVoid_ptr));
 
     // Creates function
@@ -855,11 +966,11 @@ DeclareFunInst* CodeContainer::generateFree()
 
 DeclareFunInst* CodeContainer::generateNewDsp(const string& name, int size)
 {
-    list<NamedTyped*> args;
+    Names args;
 
     BlockInst* block = InstBuilder::genBlockInst();
     {
-        list<ValueInst*> args1;
+        Values args1;
         args1.push_back(InstBuilder::genInt64NumInst(1));
         args1.push_back(InstBuilder::genInt64NumInst(size));
         block->pushBackInst(InstBuilder::genRetInst(InstBuilder::genCastInst(
@@ -873,12 +984,12 @@ DeclareFunInst* CodeContainer::generateNewDsp(const string& name, int size)
 
 DeclareFunInst* CodeContainer::generateDeleteDsp(const string& name, const string& obj)
 {
-    list<NamedTyped*> args;
+    Names args;
     args.push_back(InstBuilder::genNamedTyped(obj, Typed::kObj_ptr));
 
     BlockInst* block = InstBuilder::genBlockInst();
     {
-        list<ValueInst*> args1;
+        Values args1;
         args1.push_back(InstBuilder::genCastInst(InstBuilder::genLoadFunArgsVar(obj),
                                                 InstBuilder::genBasicTyped(Typed::kVoid_ptr)));
         block->pushBackInst(InstBuilder::genDropInst(InstBuilder::genFunCallInst("free", args1)));
@@ -890,4 +1001,20 @@ DeclareFunInst* CodeContainer::generateDeleteDsp(const string& name, const strin
     // Creates function
     FunTyped* fun_type = InstBuilder::genFunTyped(args, InstBuilder::genBasicTyped(Typed::kVoid), FunTyped::kLocal);
     return InstBuilder::genDeclareFunInst(name, fun_type, block);
+}
+
+void CodeContainer::generateJSONFile()
+{
+    // Generate JSON (which checks for non duplicated path)
+    if (gGlobal->gPrintJSONSwitch) {
+        if (gGlobal->gFloatSize == 1) {
+            generateJSONFile<float>();
+        } else {
+            generateJSONFile<double>();
+        }
+    } else {
+        // Checks for non duplicated path
+        JSONInstVisitor<float> path_checker;
+        generateUserInterface(&path_checker);
+    }
 }

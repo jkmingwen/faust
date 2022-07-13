@@ -296,7 +296,7 @@ class FaustPlugInAudioProcessor : public foleys::MagicProcessor, private juce::T
         JuceStateUI fStateUI;
         JuceParameterUI fParameterUI;
         
-        bool fIsPrepared = false;
+        bool fFirstcall = true;
         
     private:
         
@@ -380,7 +380,7 @@ class FaustPlugInAudioProcessor : public juce::AudioProcessor, private juce::Tim
         JuceStateUI fStateUI;
         JuceParameterUI fParameterUI;
     
-        bool fIsPrepared = false;
+        bool fFirstcall = true;
     
     private:
     
@@ -633,28 +633,10 @@ bool FaustPlugInAudioProcessor::supportsDoublePrecisionProcessing() const
 //==============================================================================
 void FaustPlugInAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // prepareToPlay may be called several times (like in VST3 context)
-    if (fIsPrepared) return;
-    
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need...
-    
-    fIsPrepared = true;
-    
 #ifdef JUCE_POLY
     fSynth->setCurrentPlaybackSampleRate (sampleRate);
 #else
     
-    // Possible sample size adaptation
-    if (sizeof(FAUSTFLOAT) == 8) {
-        fDSP = std::make_unique<dsp_sample_adapter<FAUSTFLOAT, float>>(fDSP.release());
-    }
-    
-    // Possibly adapt DSP inputs/outputs number
-    if (fDSP->getNumInputs() > getTotalNumInputChannels() || fDSP->getNumOutputs() > getTotalNumOutputChannels()) {
-        fDSP = std::make_unique<dsp_adapter>(fDSP.release(), getTotalNumInputChannels(), getTotalNumOutputChannels(), 4096);
-    }
-   
     // Setting the DSP control values has already been done
     // by 'buildUserInterface(&fStateUI)', using the saved values or the default ones.
     // What has to be done to finish the DSP initialization is done now.
@@ -693,6 +675,39 @@ template <typename FloatType>
 void FaustPlugInAudioProcessor::process (juce::AudioBuffer<FloatType>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    
+    /*
+        prepareToPlay is possibly called several times with different values for sampleRate
+        and isUsingDoublePrecision() state (this has been seen in particular with VTS3),
+        making proper sample format (float/double) and the inputs/outputs layout adaptation
+        more complex at this stage.
+        
+        So adapting the sample format (float/double) and the inputs/outputs layout is done
+        once at first process call even if this possibly allocates memory, which is not RT safe.
+    */
+    if (fFirstcall) {
+        fFirstcall = false;
+        
+        // Possible sample size adaptation
+        if (supportsDoublePrecisionProcessing()) {
+            if (isUsingDoublePrecision()) {
+                // Nothing to do
+            } else {
+                fDSP = std::make_unique<dsp_sample_adapter<double, float>>(fDSP.release());
+            }
+        } else {
+            if (isUsingDoublePrecision()) {
+                fDSP = std::make_unique<dsp_sample_adapter<float, double>>(fDSP.release());
+            } else {
+                // Nothing to do
+            }
+        }
+        
+        // Possibly adapt DSP inputs/outputs number
+        if (fDSP->getNumInputs() > getTotalNumInputChannels() || fDSP->getNumOutputs() > getTotalNumOutputChannels()) {
+            fDSP = std::make_unique<dsp_adapter>(fDSP.release(), getTotalNumInputChannels(), getTotalNumOutputChannels(), 4096);
+        }
+    }
     
 #ifdef JUCE_POLY
     fSynth->renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());

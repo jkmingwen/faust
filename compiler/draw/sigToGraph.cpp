@@ -109,7 +109,7 @@ static void recdraw(Tree sig, set<Tree>& drawn, ostream& fout)
                 for (int i = 0; i < n; i++) {
                     recdraw(subsig[i], drawn, fout);
                     fout << 'S' << subsig[i] << " -> " << 'S' << sig << "[" << edgeattr(getCertifiedSigType(subsig[i]))
-                         << "]" << endl;
+                         << "];" << endl;
                 }
             }
         }
@@ -205,8 +205,6 @@ static string sigLabel(Tree sig)
         fout << "@";
     } else if (isSigPrefix(sig, x, y)) {
         fout << "prefix";
-    } else if (isSigIota(sig, x)) {
-        fout << "iota";
     } else if (isSigBinOp(sig, &i, x, y)) {
         fout << binopname[i];
     } else if (isSigFFun(sig, ff, largs)) {
@@ -228,7 +226,7 @@ static string sigLabel(Tree sig)
     else if (isSigSelect2(sig, sel, x, y)) {
         fout << "select2";
     }
-    
+
     else if (isSigGen(sig, x)) {
         fout << "generator";
     }
@@ -276,15 +274,15 @@ static string sigLabel(Tree sig)
         fout << "attach";
     }
 
-    else if (isSigAssertBounds(sig, x, y, z)){
+    else if (isSigAssertBounds(sig, x, y, z)) {
         fout << "assertbounds";
     }
 
-    else if (isSigLowest(sig, x)){
+    else if (isSigLowest(sig, x)) {
         fout << "lowest";
     }
-    
-    else if (isSigHighest(sig, x)){
+
+    else if (isSigHighest(sig, x)) {
         fout << "highest";
     }
 

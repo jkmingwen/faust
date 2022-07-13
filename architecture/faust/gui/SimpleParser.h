@@ -1,26 +1,26 @@
-/************************** BEGIN SimpleParser.h **************************/
-/************************************************************************
+/************************** BEGIN SimpleParser.h *********************
  FAUST Architecture File
- Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
- This Architecture section is free software; you can redistribute it
- and/or modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 3 of
- the License, or (at your option) any later version.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as published by
+ the Free Software Foundation; either version 2.1 of the License, or
+ (at your option) any later version.
  
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU Lesser General Public License for more details.
  
- You should have received a copy of the GNU General Public License
- along with this program; If not, see <http://www.gnu.org/licenses/>.
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  
  EXCEPTION : As a special exception, you may create a larger work
  that contains this FAUST architecture section and distribute
  that work under terms of your choice, so long as this FAUST
  architecture section is not modified.
- ************************************************************************/
+ ********************************************************************/
 
 #ifndef SIMPLEPARSER_H
 #define SIMPLEPARSER_H
@@ -40,6 +40,7 @@
 #include <sstream>
 #include <stdio.h> // We use the lighter fprintf code
 #include <ctype.h>
+#include <assert.h>
 
 #ifndef _WIN32
 # pragma GCC diagnostic ignored "-Wunused-function"
@@ -48,8 +49,9 @@
 struct itemInfo {
     std::string type;
     std::string label;
-    std::string url;
+    std::string shortname;
     std::string address;
+    std::string url;
     int index;
     double init;
     double fmin;
@@ -450,15 +452,21 @@ static bool parseUI(const char*& p, std::vector<itemInfo>& uiItems, int& numItem
                     }
                 }
                 
-                else if (label == "url") {
+                else if (label == "shortname") {
                     if (parseChar(p, ':') && parseDQString(p, value)) {
-                        uiItems[numItems].url = value;
+                        uiItems[numItems].shortname = value;
                     }
                 }
                 
                 else if (label == "address") {
                     if (parseChar(p, ':') && parseDQString(p, value)) {
                         uiItems[numItems].address = value;
+                    }
+                }
+                
+                else if (label == "url") {
+                    if (parseChar(p, ':') && parseDQString(p, value)) {
+                        uiItems[numItems].url = value;
                     }
                 }
                 
@@ -513,6 +521,10 @@ static bool parseUI(const char*& p, std::vector<itemInfo>& uiItems, int& numItem
                             numItems++;
                         }
                     }
+            
+                } else {
+                    fprintf(stderr, "Parse error unknown : %s \n", label.c_str());
+                    assert(false);
                 }
             } else {
                 p = saved;

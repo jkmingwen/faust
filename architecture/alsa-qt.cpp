@@ -174,9 +174,17 @@ int main(int argc, char *argv[])
 #endif
 
     alsaaudio audio(argc, argv, DSP);
-    audio.init(name, DSP);
-    finterface->recallState(rcfilename);	
-    audio.start();
+    if (!audio.init(name, DSP)) {
+        std::cerr << "Unable to init audio" << endl;
+        exit(1);
+    }
+    
+    finterface->recallState(rcfilename);
+    
+    if (!audio.start()) {
+        std::cerr << "Unable to start audio" << endl;
+        exit(1);
+    }
 
 #ifdef HTTPCTRL
     httpdinterface->run();

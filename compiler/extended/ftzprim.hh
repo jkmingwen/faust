@@ -36,10 +36,14 @@ when it is not available on the CPU.
 *********************************************************************************************/
 
 const char* FTZPattern[4][3] = {
-    {"???", "???", "???"},                                                                                // not a float
-    {"$0", "((fabsf($0)> FLT_MIN) ? $0 : 0.0f)", "((*(int*)&$0) & 0x7F800000) ? $0 : 0.0f"},              // float  (1)
-    {"$0", "((fabs($0)> DBL_MIN) ? $0 : 0.0 )", "((*(long int*)&$0) & 0x7FF0000000000000) ? $0 : 0.0"},   // double (2)
-    {"$0", "((fabsl($0)> LDBL_MIN) ? $0 : 0.0L)", "((fabsl($0)>LDBL_MIN) ? $0 : 0.0L)"}                   // quad   (3)
+    // not a float
+    {"???", "???", "???"},
+    // float  (1)
+    {"$0", "((fabsf($0)> FLT_MIN) ? $0 : 0.0f)", "((*(int*)&$0) & 0x7F800000) ? $0 : 0.0f"},
+    // double (2)
+    {"$0", "((fabs($0)> DBL_MIN) ? $0 : 0.0 )", "((*(long int*)&$0) & 0x7FF0000000000000) ? $0 : 0.0"},
+    // quad   (3)
+    {"$0", "((fabsl($0)> LDBL_MIN) ? $0 : 0.0L)", "((fabsl($0)>LDBL_MIN) ? $0 : 0.0L)"}
 };
 
 class FtzPrim : public xtended {
@@ -81,7 +85,7 @@ class FtzPrim : public xtended {
         }
     }
 
-    virtual ValueInst* generateCode(CodeContainer* container, const list<ValueInst*>& args, ::Type result,
+    virtual ValueInst* generateCode(CodeContainer* container, Values& args, ::Type result,
                                     vector<::Type> const& types)
     {
         faustassert(args.size() == arity());
@@ -92,7 +96,7 @@ class FtzPrim : public xtended {
             switch (gGlobal->gFTZMode) {
                 case 1: {
                     // "fabs" function has to be declared
-                    list<NamedTyped*> args_types;
+                    Names args_types;
                     args_types.push_back(InstBuilder::genNamedTyped("dummy", InstBuilder::genBasicTyped(itfloat())));
                     FunTyped* fun_type = InstBuilder::genFunTyped(args_types, InstBuilder::genBasicTyped(itfloat()));
                     container->pushGlobalDeclare(InstBuilder::genDeclareFunInst(subst("fabs$0", isuffix()), fun_type));
@@ -109,7 +113,7 @@ class FtzPrim : public xtended {
                         real_min = InstBuilder::genDoubleNumInst(inummin());
                     }
 
-                    list<ValueInst*> args_value;
+                    Values args_value;
                     args_value.push_back(InstBuilder::genLoadStackVar(vname));
                     return InstBuilder::genSelect2Inst(
                         InstBuilder::genGreaterThan(InstBuilder::genFunCallInst(subst("fabs$0", isuffix()), args_value),

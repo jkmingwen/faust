@@ -20,6 +20,8 @@
 #ifndef HTTP_FETCHER_H
 #define HTTP_FETCHER_H
 
+#include "faust/export.h"
+
 /* Error sources */
 #define FETCHER_ERROR	0
 #define ERRNO			1
@@ -70,7 +72,7 @@
 	 *	# of bytes downloaded, or
 	 *	-1 on error
 	 */
-int http_fetch(const char *url, char **fileBuf);
+LIBFAUST_API int http_fetch(const char* url, char** fileBuf);
 
 	/*
 	 * Changes the User Agent (shown to the web server with each request)

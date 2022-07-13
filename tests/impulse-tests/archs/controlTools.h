@@ -130,6 +130,15 @@ struct CheckControlUI : public GenericUI {
 
 struct malloc_memory_manager : public dsp_memory_manager {
     
+    virtual void begin(size_t count) {}
+    
+    virtual void info(size_t size, size_t reads, size_t writes)
+    {
+        // TODO: use 'size', 'reads' and 'writes' to prepare memory layout for allocation
+    }
+    
+    virtual void end() {}
+    
     virtual void* allocate(size_t size)
     {
         return calloc(1, size);
@@ -218,20 +227,25 @@ static void runPolyDSP(dsp* dsp, int& linenum, int nbsamples, int num_voices = 4
         DSP->keyOn(0, 60 + i*2, 100);
     }
     
-    // Compute audio frames
-    while (nbsamples > 0) {
-        int nFrames = min(kFrames, nbsamples);
-        DSP->compute(nFrames, ichan.buffers(), ochan.buffers());
-        // Print samples
-        for (int i = 0; i < nFrames; i++) {
-            printf("%6d : ", linenum++);
-            for (int c = 0; c < nouts; c++) {
-                FAUSTFLOAT f = normalize(ochan.buffers()[c][i]);
-                printf(" %8.6f", f);
+    int i = 0;
+    try {
+        // Compute audio frames
+        while (nbsamples > 0) {
+            int nFrames = min(kFrames, nbsamples);
+            DSP->compute(nFrames, ichan.buffers(), ochan.buffers());
+            // Print samples
+            for (i = 0; i < nFrames; i++) {
+                printf("%6d : ", linenum++);
+                for (int c = 0; c < nouts; c++) {
+                    FAUSTFLOAT f = normalize(ochan.buffers()[c][i]);
+                    printf(" %8.6f", f);
+                }
+                printf("\n");
             }
-            printf("\n");
+            nbsamples -= nFrames;
         }
-        nbsamples -= nFrames;
+    } catch (...) {
+        cerr << "ERROR at line : " << i << std::endl;
     }
     
     delete DSP;

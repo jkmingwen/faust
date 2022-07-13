@@ -15,11 +15,11 @@ import shutil
 ###########################################
 
 # TODO Is this cross platform? Does it work on Windows?
-def convert_files(dsp_file, out_dir, arch):
+def convert_files(dsp_file, out_dir, arch, faustflags):
     cpp_file = path.splitext(path.basename(dsp_file))[0] + ".cpp"
     arch_file = arch or "supercollider.cpp"
 
-    cmd = "faust -i -a %s -json %s -o %s" % (arch_file, dsp_file, cpp_file)
+    cmd = "faust -i -a %s -json %s -o %s %s" % (arch_file, dsp_file, cpp_file, faustflags)
 
     result = {
         "arch_file": arch_file,
@@ -125,9 +125,9 @@ def faustoptflags():
 # Return the header paths if they exists.
 def get_header_paths(headerpath):
     folders = [
-        path.join(headerpath, "plugin_interface"),
-        path.join(headerpath, "server"),
-        path.join(headerpath, "common")
+        path.join(headerpath, "include", "plugin_interface"),
+        path.join(headerpath, "include", "server"),
+        path.join(headerpath, "include",  "common")
     ]
 
     if all(path.exists(folder) for folder in folders):
@@ -203,7 +203,7 @@ def compile(out_dir, cpp_file, class_name, compile_supernova, headerpath, macos_
 
         if compile_supernova:
             supernova_obj = path.join(out_dir, class_name + "_supernova." + env["EXT"])
-            supernova_compile_command = "%s %s -Dmydsp=\"%s\" -o %s %s" % (os.environ["CXX"], flags, class_name, supernova_obj, cpp_file)
+            supernova_compile_command = "%s %s -DSUPERNOVA -Dmydsp=\"%s\" -o %s %s" % (os.environ["CXX"], flags, class_name + "_supernova", supernova_obj, cpp_file)
 
             print("Compiling supernova object using command:\n%s" % supernova_compile_command)
             os.system(supernova_compile_command.replace("\n", ""))
@@ -356,6 +356,7 @@ def get_parameter_list(json_data, with_initialization):
         else:
             this_argument = param_name
 
+        this_argument = this_argument.replace(" ", "_")
         if counter != 0:
             out_string = out_string + ", " + this_argument
         else:
@@ -505,9 +506,9 @@ def make_class_file(target_dir, json_data, noprefix):
 ###########################################
 
 # Generate SuperCollider class and help files and return a dictionary of paths to the generated files including the .cpp and .json files produced by the faust command.
-def faust2sc(faustfile, target_folder, noprefix, arch):
+def faust2sc(faustfile, target_folder, noprefix, arch, faustflags):
     print("Converting faust file to SuperCollider class and help files.\nTarget dir: %s" % target_folder)
-    result = convert_files(faustfile, target_folder, arch)
+    result = convert_files(faustfile, target_folder, arch, faustflags)
 
     data = read_json(result["json_file"])
     make_class_file(target_folder, data, noprefix)
@@ -531,19 +532,25 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--architecture", help="Use an alternative architecture file. If not set, it will use the default supercollider.cpp file that comes with faust.")
 
     parser.add_argument("-m", "--macosarch", help="Enforce a macOS architecture. Can be either arm64 or x86_64 (Rosetta on Mx sillicon)")
-    parser.add_argument("-t", "--targetfolder", help="Put the generated files in this folder. If not used, it will put the files in the current working directory.")
+    parser.add_argument("-o", "--outputfolder", help="Put the generated files in this folder. If not used, it will put the files in the current working directory.")
     parser.add_argument("-n", "--noprefix", help="1 == Do not prefix the SuperCollider class and object with Faust. 0 == prefix. It is 1 by default, ie not using the Faust prefix.", type=int, choices=[0,1])
     parser.add_argument("-s", "--supernova", help="Compile with supernova plugin", action="store_true")
     parser.add_argument("-c", "--cpp", help="Copy cpp file to target directory after compilation.", action="store_true")
     parser.add_argument("-p", "--headerpath", default="./include", help="Path to SuperCollider headers. If no header path is supplied, the script will try to find the headers in common locations.")
-    args = parser.parse_args()
+
+    # args = parser.parse_args()
+    args, unknownargs = parser.parse_known_args()
+
+    # Flatten list of arguments to one string
+    unknownargs = " ".join(unknownargs)
+    faustflags = unknownargs or ""
 
     # Temporary folder for intermediary files
     tmp_folder = tempfile.TemporaryDirectory(prefix="faust.")
 
     # Generate supercollider class and help file
     noprefix = args.noprefix or 1
-    scresult = faust2sc(args.inputfile, tmp_folder.name, noprefix, args.architecture)
+    scresult = faust2sc(args.inputfile, tmp_folder.name, noprefix, args.architecture, faustflags)
 
     compile_supernova = args.supernova
     header_path = args.headerpath
@@ -554,7 +561,7 @@ if __name__ == "__main__":
 
     # Move files to target
     env = faustoptflags()
-    target = args.targetfolder or os.getcwd()
+    target = args.outputfolder or os.getcwd()
 
     # Move SuperCollider files
     shutil.copytree(path.join(tmp_folder.name, "Classes"), path.join(target, "Classes"), dirs_exist_ok=True)

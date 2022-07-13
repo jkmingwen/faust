@@ -32,7 +32,7 @@ do
     p=$1
 
     if [ $p = "-help" ] || [ $p = "-h" ]; then
-        usage faust2alsaconsole "[options] <file.dsp>"
+        usage faust2alsaconsole "[options] [Faust options] <file.dsp>"
         platform Linux
         require Alsa
         echo "Compiles Faust programs to CLI and ALSA"
@@ -41,6 +41,7 @@ do
         option "-nvoices <num>"
         option -arch32 "compiles a 32 bits binary"
         option -arch64 "compiles a 64 bits binary"
+        option "Faust options"
         exit
     fi
     
@@ -57,6 +58,7 @@ do
          OSCDEFS="-DOSCCTRL -lOSCFaust"
     elif [ $p = "-httpd" ]; then
         HTTPDEFS="-DHTTPCTRL -lHTTPDFaust -lmicrohttpd"
+        HTTPLIBS=`pkg-config --cflags --libs libmicrohttpd`
     elif [ $p = "-arch32" ]; then
         PROCARCH="-m32 -L/usr/lib32"
     elif [ $p = "-arch64" ]; then
@@ -83,7 +85,7 @@ for f in $FILES; do
 
     # compile c++ to binary
     (
-        $CXX $CXXFLAGS $FAUSTTOOLSFLAGS $OMP "$f.cpp" `pkg-config --cflags --libs alsa` $PROCARCH $OSCDEFS $HTTPDEFS $POLYDEFS $MIDIDEFS -lpthread -o "${f%.dsp}"
+        $CXX $CXXFLAGS $FAUSTTOOLSFLAGS $OMP "$f.cpp" `pkg-config --cflags --libs alsa` $PROCARCH $OSCDEFS $HTTPDEFS $HTTPLIBS $POLYDEFS $MIDIDEFS -lpthread -o "${f%.dsp}"
     ) > /dev/null || exit
     rm "$f.cpp"
 

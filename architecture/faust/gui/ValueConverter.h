@@ -1,26 +1,26 @@
-/************************** BEGIN ValueConverter.h **************************/
-/************************************************************************
+/************************** BEGIN ValueConverter.h ********************
  FAUST Architecture File
- Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
- This Architecture section is free software; you can redistribute it
- and/or modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 3 of
- the License, or (at your option) any later version.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as published by
+ the Free Software Foundation; either version 2.1 of the License, or
+ (at your option) any later version.
  
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU Lesser General Public License for more details.
  
- You should have received a copy of the GNU General Public License
- along with this program; If not, see <http://www.gnu.org/licenses/>.
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  
  EXCEPTION : As a special exception, you may create a larger work
  that contains this FAUST architecture section and distribute
  that work under terms of your choice, so long as this FAUST
  architecture section is not modified.
- ************************************************************************/
+ ********************************************************************/
 
 #ifndef __ValueConverter__
 #define __ValueConverter__
@@ -74,6 +74,8 @@
 #include <vector>
 #include <assert.h>
 
+#include "faust/export.h"
+
 //--------------------------------------------------------------------------------------
 // Interpolator(lo,hi,v1,v2)
 // Maps a value x between lo and hi to a value y between v1 and v2
@@ -83,8 +85,8 @@
 // y = v1 - lo*coef + x*coef
 // y = offset + x*coef              with offset = v1 - lo*coef
 //--------------------------------------------------------------------------------------
-class Interpolator
-{
+class FAUST_API Interpolator {
+    
     private:
 
         //--------------------------------------------------------------------------------------
@@ -135,8 +137,7 @@ class Interpolator
 // Interpolator3pt(lo,mi,hi,v1,vm,v2)
 // Map values between lo mid hi to values between v1 vm v2
 //--------------------------------------------------------------------------------------
-class Interpolator3pt
-{
+class FAUST_API Interpolator3pt {
 
     private:
 
@@ -162,8 +163,7 @@ class Interpolator3pt
 //--------------------------------------------------------------------------------------
 // Abstract ValueConverter class. Converts values between UI and Faust representations
 //--------------------------------------------------------------------------------------
-class ValueConverter // Identity by default
-{
+class FAUST_API ValueConverter {
 
     public:
 
@@ -176,7 +176,7 @@ class ValueConverter // Identity by default
 // A converter than can be updated
 //--------------------------------------------------------------------------------------
 
-class UpdatableValueConverter : public ValueConverter {
+class FAUST_API UpdatableValueConverter : public ValueConverter {
     
     protected:
         
@@ -200,8 +200,7 @@ class UpdatableValueConverter : public ValueConverter {
 //--------------------------------------------------------------------------------------
 // Linear conversion between ui and Faust values
 //--------------------------------------------------------------------------------------
-class LinearValueConverter : public ValueConverter
-{
+class FAUST_API LinearValueConverter : public ValueConverter {
     
     private:
         
@@ -224,8 +223,7 @@ class LinearValueConverter : public ValueConverter
 //--------------------------------------------------------------------------------------
 // Two segments linear conversion between ui and Faust values
 //--------------------------------------------------------------------------------------
-class LinearValueConverter2 : public UpdatableValueConverter
-{
+class FAUST_API LinearValueConverter2 : public UpdatableValueConverter {
     
     private:
     
@@ -260,8 +258,7 @@ class LinearValueConverter2 : public UpdatableValueConverter
 //--------------------------------------------------------------------------------------
 // Logarithmic conversion between ui and Faust values
 //--------------------------------------------------------------------------------------
-class LogValueConverter : public LinearValueConverter
-{
+class FAUST_API LogValueConverter : public LinearValueConverter {
 
     public:
 
@@ -277,8 +274,7 @@ class LogValueConverter : public LinearValueConverter
 //--------------------------------------------------------------------------------------
 // Exponential conversion between ui and Faust values
 //--------------------------------------------------------------------------------------
-class ExpValueConverter : public LinearValueConverter
-{
+class FAUST_API ExpValueConverter : public LinearValueConverter {
 
     public:
 
@@ -295,8 +291,7 @@ class ExpValueConverter : public LinearValueConverter
 // Convert accelerometer or gyroscope values to Faust values
 // Using an Up curve (curve 0)
 //--------------------------------------------------------------------------------------
-class AccUpConverter : public UpdatableValueConverter
-{
+class FAUST_API AccUpConverter : public UpdatableValueConverter {
 
     private:
 
@@ -331,8 +326,7 @@ class AccUpConverter : public UpdatableValueConverter
 // Convert accelerometer or gyroscope values to Faust values
 // Using a Down curve (curve 1)
 //--------------------------------------------------------------------------------------
-class AccDownConverter : public UpdatableValueConverter
-{
+class FAUST_API AccDownConverter : public UpdatableValueConverter {
 
     private:
 
@@ -366,8 +360,7 @@ class AccDownConverter : public UpdatableValueConverter
 // Convert accelerometer or gyroscope values to Faust values
 // Using an Up-Down curve (curve 2)
 //--------------------------------------------------------------------------------------
-class AccUpDownConverter : public UpdatableValueConverter
-{
+class FAUST_API AccUpDownConverter : public UpdatableValueConverter {
 
     private:
 
@@ -401,8 +394,7 @@ class AccUpDownConverter : public UpdatableValueConverter
 // Convert accelerometer or gyroscope values to Faust values
 // Using a Down-Up curve (curve 3)
 //--------------------------------------------------------------------------------------
-class AccDownUpConverter : public UpdatableValueConverter
-{
+class FAUST_API AccDownUpConverter : public UpdatableValueConverter {
 
     private:
 
@@ -435,8 +427,7 @@ class AccDownUpConverter : public UpdatableValueConverter
 //--------------------------------------------------------------------------------------
 // Base class for ZoneControl
 //--------------------------------------------------------------------------------------
-class ZoneControl
-{
+class FAUST_API ZoneControl {
 
     protected:
 
@@ -464,8 +455,7 @@ class ZoneControl
 //--------------------------------------------------------------------------------------
 //  Useful to implement accelerometers metadata as a list of ZoneControl for each axes
 //--------------------------------------------------------------------------------------
-class ConverterZoneControl : public ZoneControl
-{
+class FAUST_API ConverterZoneControl : public ZoneControl {
 
     protected:
 
@@ -486,8 +476,7 @@ class ConverterZoneControl : public ZoneControl
 // Association of a zone and a four value converter, each one for each possible curve.
 // Useful to implement accelerometers metadata as a list of ZoneControl for each axes
 //--------------------------------------------------------------------------------------
-class CurveZoneControl : public ZoneControl
-{
+class FAUST_API CurveZoneControl : public ZoneControl {
 
     private:
 
@@ -507,10 +496,7 @@ class CurveZoneControl : public ZoneControl
         }
         virtual ~CurveZoneControl()
         {
-            std::vector<UpdatableValueConverter*>::iterator it;
-            for (it = fValueConverters.begin(); it != fValueConverters.end(); it++) {
-                delete(*it);
-            }
+            for (const auto& it : fValueConverters) { delete it; }
         }
         void update(double v) const { if (fValueConverters[fCurve]->getActive()) *fZone = FAUSTFLOAT(fValueConverters[fCurve]->ui2faust(v)); }
 
@@ -527,17 +513,13 @@ class CurveZoneControl : public ZoneControl
 
         void setActive(bool on_off)
         {
-            std::vector<UpdatableValueConverter*>::iterator it;
-            for (it = fValueConverters.begin(); it != fValueConverters.end(); it++) {
-                (*it)->setActive(on_off);
-            }
+            for (const auto& it : fValueConverters) { it->setActive(on_off); }
         }
 
         int getCurve() { return fCurve; }
 };
 
-class ZoneReader
-{
+class FAUST_API ZoneReader {
 
     private:
 

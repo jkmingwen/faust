@@ -26,14 +26,15 @@
 #include <ostream>
 #include <string>
 
-#include "exception.hh"
-#include "export.hh"
+#include "faust/export.h"
 #include "faust/gui/CInterface.h"
 #include "faust/gui/meta.h"
 #include "faust/dsp/dsp.h"
 
-#define COMPILATION_OPTIONS_KEY "compilation_options"
-#define COMPILATION_OPTIONS "declare compilation_options    "
+#include "exception.hh"
+
+#define COMPILATION_OPTIONS_KEY "compile_options"
+#define COMPILATION_OPTIONS "declare compile_options "
 
 /*
  In order to better separate compilation and execution for dynamic backends (LLVM, Interpreter, WebAssembly).

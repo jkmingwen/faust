@@ -67,6 +67,8 @@ struct dsp_factory_base;
 
 typedef long double quad;
 
+typedef map<string, int> PathTableType;
+
 struct comp_str {
     bool operator()(Tree s1, Tree s2) const { return (strcmp(tree2str(s1), tree2str(s2)) < 0); }
 };
@@ -146,6 +148,7 @@ struct global {
     bool gLightMode;  // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
                       // for JavaScript)
     bool   gClang;    // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
+    bool   gNoVirtual;   // when compiled with the C++ backend, does not add the 'virtual' keyword
     string gCheckTable;  // whether to check RDTable and RWTable index range
     
     bool   gMathExceptions;  // whether to check math functions domains
@@ -219,6 +222,15 @@ struct global {
     list<string> gInputFiles;
 
     int gFileNum;
+    
+    // ------------
+    // boxppShared
+    // ------------
+    
+    // Tree is used to identify the same nodes during tree traversal,
+    // but gExpCounter is then used to generate unique IDs
+    std::map<Tree, std::pair<int, std::string>> gExpTable;
+    int gExpCounter;
 
     int gCountInferences;
     int gCountMaximal;
@@ -227,7 +239,7 @@ struct global {
     int gBoxSlotNumber;  ///< counter for unique slot number
 
     bool gMemoryManager;
-
+   
     bool gLocalCausalityCheck;  ///< when true trigs local causality errors (negative delay)
 
     bool gCausality;  ///< (FIXME: global used as a parameter of typeAnnotation) when true trigs causality errors
@@ -358,12 +370,10 @@ struct global {
     property<Tree>* gSymListProp;
 
     Sym SIGINPUT;
-    int gMaxInputs;  // Max input allocated with sigInput API
     Sym SIGOUTPUT;
     Sym SIGDELAY1;
     Sym SIGDELAY;
     Sym SIGPREFIX;
-    Sym SIGIOTA;
     Sym SIGRDTBL;
     Sym SIGWRTBL;
     Sym SIGTABLE;
@@ -481,12 +491,14 @@ struct global {
     set<Tree>         gDrawnExp;        // Expressions drawn or scheduled so far
     const char*       gDevSuffix;       // .svg or .ps used to choose output device
     string            gSchemaFileName;  // name of schema file beeing generated
+    Tree              gInverter[6];
     map<Tree, string> gBackLink;        // link to enclosing file for sub schema
 
     // FIR
     map<Typed::VarType, BasicTyped*> gTypeTable;     // To share a unique BasicTyped* object for a given type
     map<string, Typed*>              gVarTypeTable;  // Types of variables or functions
     map<Typed::VarType, int>         gTypeSizeMap;   // Size of types in bytes
+    map<string, pair<string, int>>   gTablesSize;    // Global tables size in bytes: class name, <table name, size>
 
     // colorize
     map<Tree, int> gColorMap;
@@ -536,6 +548,9 @@ struct global {
     bool   gDrawSVGSwitch;
     bool   gVHDLSwitch;
     bool   gVHDLTrace;
+    int    gVHDLFloatType; //sfixed(msb downto lsb) or float(msb downto lsb)
+    int    gVHDLFloatMSB;
+    int    gVHDLFloatLSB;
     bool   gElementarySwitch;
     bool   gPrintXMLSwitch;
     bool   gPrintJSONSwitch;
@@ -599,6 +614,7 @@ struct global {
     bool hasForeignFunction(const string& name, const string& inc_file);
    
     void printCompilationOptions(stringstream& dst, bool backend = true);
+    string printCompilationOptions1();
 
     void initTypeSizeMap();
 

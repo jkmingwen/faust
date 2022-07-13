@@ -1,27 +1,26 @@
-/************************** BEGIN dsp-optimizer.h **************************/
-/************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2016-2020 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it 
-    and/or modify it under the terms of the GNU General Public License 
-    as published by the Free Software Foundation; either version 3 of 
-    the License, or (at your option) any later version.
+/************************** BEGIN dsp-optimizer.h ***************************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License 
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-    EXCEPTION : As a special exception, you may create a larger work 
-    that contains this FAUST architecture section and distribute  
-    that work under terms of your choice, so long as this FAUST 
-    architecture section is not modified. 
-
-************************************************************************/
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+***************************************************************************/
 
 #ifndef __dsp_optimizer__
 #define __dsp_optimizer__
@@ -35,15 +34,15 @@
 #include "faust/dsp/llvm-dsp.h"
 #include "faust/dsp/dsp-bench.h"
 
+typedef std::vector<std::string> TOption;
+typedef std::vector<TOption> TOptionTable;
+
 /*
     A class to find optimal Faust compiler parameters for a given DSP.
 */
 template <typename REAL>
 class dsp_optimizer_real {
 
-    typedef std::vector<std::string> TOption;
-    typedef std::vector<TOption> TOptionTable;
-    
     private:
     
         int fBufferSize;     // size of a vector in samples
@@ -71,7 +70,7 @@ class dsp_optimizer_real {
     
         TOptionTable fOptionsTable;
     
-        double bench(int run)
+        std::pair<double, double> bench(int run)
         {
             // First call with fCount = -1 will be used to estimate fCount by giving the wanted measure duration
             if (fCount == -1) {
@@ -79,7 +78,7 @@ class dsp_optimizer_real {
                 mes.measure();
                 // fCount is kept from the first duration measure
                 fCount = mes.getCount();
-                return mes.getStats();
+                return std::make_pair(mes.getStats(), mes.getCPULoad());
             } else {
                 measure_dsp_real<REAL> mes(fDSP, fBufferSize, fCount, fTrace, fControl, fDownSampling, fUpSampling, fFilter);
                 for (int i = 0; i < run; i++) {
@@ -89,7 +88,7 @@ class dsp_optimizer_real {
                     }
                     FAUSTBENCH_LOG<double>(mes.getStats());
                 }
-                return mes.getStats();
+                return std::make_pair(mes.getStats(), mes.getCPULoad());
             }
         }
     
@@ -231,7 +230,7 @@ class dsp_optimizer_real {
             return res_item;
         }
         
-        bool computeOne(const TOption& item, int run, double& res)
+        bool computeOne(const TOption& item, int run, std::pair<double, double>& res)
         {
             int argc = 0;
             const char* argv[64];
@@ -263,30 +262,33 @@ class dsp_optimizer_real {
             // fDSP is deallocated by bench calling measure_dsp
             
             deleteDSPFactory(fFactory);
-            fFactory = 0;
-            fDSP = 0;
+            fFactory = nullptr;
+            fDSP = nullptr;
             
             return true;
         }
     
-        std::pair<double, TOption> findOptimizedParametersAux(const TOptionTable& options)
+        std::tuple<double, double, TOption> findOptimizedParametersAux(const TOptionTable& options)
         {
-            std::vector<std::pair<int, double > > table_res;
-            double res = 0.;
+            std::vector<std::tuple<int, double, double> > table_res;
+            std::pair<double, double> res = {0., 0.};
             
             for (int i = 0; i < options.size(); i++) {
                 if (computeOne(addArgvItems(options[i], fArgc, fArgv), fRun, res)) {
-                    table_res.push_back(std::make_pair(i, res));
+                    table_res.push_back(std::make_tuple(i, res.first, res.second));
                 } else {
                     fprintf(stderr, "computeOne error...\n");
                 }
             }
             
             sort(table_res.begin(), table_res.end(), compareFun);
-            return std::make_pair(table_res[0].second, options[table_res[0].first]);
+            return std::make_tuple(std::get<1>(table_res[0]), std::get<2>(table_res[0]), options[std::get<0>(table_res[0])]);
         }
 
-        static bool compareFun(std::pair<int, double> i, std::pair<int, double> j) { return (i.second > j.second); }
+        static bool compareFun(std::tuple<int, double, double> i, std::tuple<int, double, double> j)
+        {
+            return (std::get<1>(i) > std::get<1>(j));
+        }
     
         bool init(const std::string& filename,
                   const std::string& input,
@@ -321,18 +323,18 @@ class dsp_optimizer_real {
             init();
             
             if (fTrace) fprintf(stdout, "Estimate timing parameters\n");
-            double res1 = 0.;
+            std::pair<double, double> res1 = {0., 0.};
             if (!computeOne(addArgvItems(fOptionsTable[0], fArgc, fArgv), 1, res1)) {
                 fprintf(stderr, "computeOne error...\n");
                 return false;
             }
             if (fTrace) fprintf(stdout, "Testing -exp10 need\n");
-            double res2 = 0.;
+            std::pair<double, double> res2 = {0., 0.};
             if (!computeOne(addArgvItems(fOptionsTable[1], fArgc, fArgv), 1, res2)) {
                 fprintf(stderr, "computeOne error...\n");
                 return false;
             }
-            fNeedExp10 = (res2 > (res1 * 1.05)); // If more than 5% faster
+            fNeedExp10 = (std::get<0>(res2) > (std::get<0>(res1) * 1.05)); // If more than 5% faster
             return true;
         }
     
@@ -355,7 +357,7 @@ class dsp_optimizer_real {
          * @param filter - filter type
          * since the maximum value may change with new LLVM versions)
          */
-        dsp_optimizer_real(const char* filename,
+        dsp_optimizer_real(const std::string& filename,
                            int argc,
                            const char* argv[],
                            const std::string& target,
@@ -379,17 +381,23 @@ class dsp_optimizer_real {
         /**
          * Returns the best compilations parameters.
          *
-         * @return the best result (in Megabytes/seconds), and compilation parameters in a vector.
+         * @return the best result (in Megabytes/seconds) and DSP CPU (in 0..1), and compilation parameters in a vector.
          */
-        std::pair<double, TOption> findOptimizedParameters()
+        std::tuple<double, double, TOption> findOptimizedParameters()
         {
             if (fTrace) fprintf(stdout, "Discover best parameters option\n");
-            std::pair<double, TOption> best1 = findOptimizedParametersAux(fOptionsTable);
+            std::tuple<double, double, TOption> best1 = findOptimizedParametersAux(fOptionsTable);
             
             if (fTrace) fprintf(stdout, "Refined with -mcd\n");
             TOptionTable options_table;
+        
+            // Start from 0
+            TOption best2 = std::get<2>(best1);
+            best2.push_back("-mcd");
+            best2.push_back("0");
+            options_table.push_back(best2);
             for (int size = 2; size <= 256; size *= 2) {
-                TOption best2 = best1.second;
+                TOption best2 = std::get<2>(best1);
                 best2.push_back("-mcd");
                 best2.push_back(std::to_string(size));
                 options_table.push_back(best2);
@@ -402,31 +410,31 @@ class dsp_optimizer_real {
                 options_table.push_back(t0_exp10);
             }
             
-            std::pair<double, TOption > best3 = findOptimizedParametersAux(options_table);
+            std::tuple<double, double, TOption> best3 = findOptimizedParametersAux(options_table);
            
-            if (best3.second[0] == "-vec") {
+            if (std::get<2>(best3)[0] == "-vec") {
                 if (fTrace) fprintf(stdout, "Check with -g or -dfs\n");
                 // Current best
                 TOptionTable options_table1;
                 {
-                    TOption best2 = best3.second;
+                    TOption best2 = std::get<2>(best3);
                     options_table1.push_back(best2);
                 }
                 // Add -g
                 {
-                    TOption best2 = best3.second;
+                    TOption best2 = std::get<2>(best3);
                     best2.push_back("-g");
                     options_table1.push_back(best2);
                 }
                 // Add -dfs
                 {
-                    TOption best2 = best3.second;
+                    TOption best2 = std::get<2>(best3);
                     best2.push_back("-dfs");
                     options_table1.push_back(best2);
                 }
                 // Add -g and -dfs
                 {
-                    TOption best2 = best3.second;
+                    TOption best2 = std::get<2>(best3);
                     best2.push_back("-g");
                     best2.push_back("-dfs");
                     options_table1.push_back(best2);
@@ -450,7 +458,7 @@ class dsp_optimizer : public dsp_optimizer_real<FAUSTFLOAT> {
 
     public:
     
-        dsp_optimizer(const char* filename,
+        dsp_optimizer(const std::string& filename,
                        int argc,
                        const char* argv[],
                        const std::string& target,

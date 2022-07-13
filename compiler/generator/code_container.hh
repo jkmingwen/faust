@@ -28,7 +28,6 @@
 #include "code_loop.hh"
 #include "description.hh"
 #include "dsp_factory.hh"
-#include "export.hh"
 #include "floats.hh"
 #include "garbageable.hh"
 #include "instructions.hh"
@@ -48,6 +47,24 @@
 
 class TextInstVisitor;
 
+// Look for the name of a given subcontainer
+struct SearchSubcontainer : public DispatchVisitor {
+    
+    string fClassName;
+    bool fFound = false;
+    
+    SearchSubcontainer(const string& class_name):fClassName(class_name)
+    {}
+    
+    virtual void visit(NamedTyped* typed)
+    {
+        fFound |= (fClassName == typed->getName());
+    }
+};
+
+// DSP or field name, type, size, sizeBytes, reads, writes
+typedef vector<tuple<string, int, int, int, int, int>> MemoryLayoutType;
+
 class CodeContainer : public virtual Garbageable {
    protected:
     list<CodeContainer*> fSubContainers;
@@ -61,6 +78,8 @@ class CodeContainer : public virtual Garbageable {
 
     int  fSubContainerType;
     bool fGeneratedSR;
+
+    MemoryLayoutType fMemoryLayout;
 
     string fKlassName;
 
@@ -157,9 +176,7 @@ class CodeContainer : public virtual Garbageable {
 
         dst << "Code generated with Faust " << FAUSTVERSION << " (https://faust.grame.fr)" << endl;
         dst << "Compilation options: ";
-        stringstream options;
-        gGlobal->printCompilationOptions(options);
-        dst << options.str();
+        dst << gGlobal->printCompilationOptions1();
         dst << "\n------------------------------------------------------------ */" << endl;
     }
 
@@ -321,23 +338,22 @@ class CodeContainer : public virtual Garbageable {
     template <typename REAL>
     void generateJSONFile()
     {
-        JSONInstVisitor<REAL> json_visitor;
-        generateJSON(&json_visitor);
+        JSONInstVisitor<REAL> visitor;
+        generateJSON(&visitor);
         ofstream xout(subst("$0.json", gGlobal->makeDrawPath()).c_str());
-        xout << json_visitor.JSON();
+        xout << visitor.JSON();
     }
     
     template <typename REAL>
     void generateJSON(JSONInstVisitor<REAL>* visitor)
     {
-        // Prepare compilation options
-        stringstream compile_options;
-        gGlobal->printCompilationOptions(compile_options);
-        
         // "name", "filename" found in medata
-        visitor->init("", "", fNumInputs, fNumOutputs, -1, "", "", FAUSTVERSION, compile_options.str(),
-                      gGlobal->gReader.listLibraryFiles(), gGlobal->gImportDirList, -1, std::map<std::string, int>());
-        
+        visitor->init("", "", fNumInputs, fNumOutputs, -1, "", "",
+                      FAUSTVERSION, gGlobal->printCompilationOptions1(),
+                      gGlobal->gReader.listLibraryFiles(),
+                      gGlobal->gImportDirList,
+                      -1, std::map<std::string, int>(),
+                      fMemoryLayout);
         generateUserInterface(visitor);
         generateMetaData(visitor);
     }
@@ -348,6 +364,15 @@ class CodeContainer : public virtual Garbageable {
         JSONInstVisitor<REAL> visitor;
         generateJSON(&visitor);
         return visitor.JSON(true);
+    }
+    
+    string generateJSONAux()
+    {
+        if (gGlobal->gFloatSize == 1) {
+            return generateJSON<float>();
+        } else {
+            return generateJSON<double>();
+        }
     }
 
     /* Can be overridden by subclasses to transform the FIR before the actual code generation */
@@ -376,7 +401,7 @@ class CodeContainer : public virtual Garbageable {
     }
 
     ValueInst* pushFunction(const string& name, Typed::VarType result, vector<Typed::VarType>& types,
-                            const list<ValueInst*>& args);
+                            const Values& args);
 
     void generateExtGlobalDeclarations(InstVisitor* visitor)
     {
@@ -617,6 +642,8 @@ class CodeContainer : public virtual Garbageable {
         faustassert(false);
         return nullptr;
     }
+    
+    void generateJSONFile();
 
     int fInt32ControlNum;  // number of 'int32' intermediate control values
     int fRealControlNum;   // number of 'real' intermediate control values

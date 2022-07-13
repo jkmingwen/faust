@@ -78,15 +78,33 @@ class MinPrim : public xtended {
         }
     }
 
-    virtual ValueInst* generateCode(CodeContainer* container, const list<ValueInst*>& args, ::Type result,
+    virtual ValueInst* generateCode(CodeContainer* container, Values& args, ::Type result,
                                     vector<::Type> const& types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());
-
+    
+        /*
+         04/25/22 : this optimisation cannot be done because interval computation is buggy: like no.noise interval [O..inf] !
+         */
+    
+        /*
+            // Min of disjoint intervals returns one of them
+            interval i1 = types[0]->getInterval();
+            interval i2 = types[1]->getInterval();
+            
+            if (i1.valid && i2.valid) {
+                if (i1.hi <= i2.lo) {
+                    return *args.begin();
+                } else if (i2.hi <= i1.lo) {
+                    return *(std::next(args.begin(), 1));
+                }
+            }
+         */
+    
         Typed::VarType         result_type = (result->nature() == kInt) ? Typed::kInt32 : itfloat();
         vector<Typed::VarType> arg_types;
-        list<ValueInst*>       casted_args;
+        Values       casted_args;
 
         // generates code compatible with overloaded min
         int n0 = types[0]->nature();
@@ -102,7 +120,7 @@ class MinPrim : public xtended {
             } else {
                 faustassert(n1 == kInt);  // second argument is not float, cast it to float
                 // prepare args values
-                list<ValueInst*>::const_iterator it2 = args.begin();
+                ValuesIt it2 = args.begin();
                 casted_args.push_back((*it2));
                 it2++;
                 casted_args.push_back(InstBuilder::genCastFloatInst(*it2));
@@ -116,7 +134,7 @@ class MinPrim : public xtended {
             arg_types.push_back(itfloat());
 
             // prepare args values
-            list<ValueInst*>::const_iterator it2 = args.begin();
+            ValuesIt it2 = args.begin();
             casted_args.push_back(InstBuilder::genCastFloatInst(*it2));
             it2++;
             casted_args.push_back((*it2));
@@ -138,7 +156,7 @@ class MinPrim : public xtended {
                 } else {
                     faustassert(b1 == kBool);  // second is boolean, cast to int
                     // prepare args values
-                    list<ValueInst*>::const_iterator it2 = args.begin();
+                    ValuesIt it2 = args.begin();
                     casted_args.push_back((*it2));
                     it2++;
                     casted_args.push_back(InstBuilder::genCastInt32Inst(*it2));
@@ -147,7 +165,7 @@ class MinPrim : public xtended {
             } else if (b1 == kNum) {
                 faustassert(b0 == kBool);  // first is boolean, cast to int
                 // prepare args values
-                list<ValueInst*>::const_iterator it2 = args.begin();
+                ValuesIt it2 = args.begin();
                 casted_args.push_back(InstBuilder::genCastInt32Inst(*it2));
                 it2++;
                 casted_args.push_back((*it2));
@@ -157,7 +175,7 @@ class MinPrim : public xtended {
                 // '1' and 'false' is actually '0' (which is not the case if compiled in SSE mode)
                 faustassert(b0 == kBool);
                 faustassert(b1 == kBool);  // both are booleans, cast both
-                list<ValueInst*>::const_iterator it2 = args.begin();
+                ValuesIt it2 = args.begin();
                 casted_args.push_back(InstBuilder::genCastInt32Inst(*it2));
                 it2++;
                 casted_args.push_back(InstBuilder::genCastInt32Inst(*it2));

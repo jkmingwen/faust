@@ -116,7 +116,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
 
         if (array_typed && array_typed->fSize > 1) {
             if (is_struct) {
-                fFieldTable[name] = MemoryDesc(-1, fStructOffset, array_typed->fSize, array_typed->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fStructOffset, array_typed->fSize, array_typed->getSizeBytes(), array_typed->fType->getType());
                 // Always use biggest size so that int/real access are correctly aligned
                 fStructOffset += (array_typed->fSize * gGlobal->audioSampleSize());
             } else {
@@ -125,7 +125,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
             }
         } else {
             if (is_struct) {
-                fFieldTable[name] = MemoryDesc(-1, fStructOffset, 1, inst->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fStructOffset, 1, inst->fType->getSizeBytes(), inst->fType->getType());
                 // Always use biggest size so that int/real access are correctly aligned
                 fStructOffset += gGlobal->audioSampleSize();
             } else {
@@ -169,12 +169,10 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         fTab--;
     }
 
-    virtual void generateFunCallArgs(list<ValueInst*>::const_iterator beg, list<ValueInst*>::const_iterator end,
-                                     int size)
+    virtual void generateFunCallArgs(ValuesIt beg, ValuesIt end, size_t size)
     {
-        list<ValueInst*>::const_iterator it = beg;
-        int                              i  = 0;
-        for (it = beg; it != end; it++, i++) {
+        size_t i = 0;
+        for (ValuesIt it = beg; it != end; it++, i++) {
             // Compile argument
             (*it)->accept(this);
             if (i < size - 1) *fOut << " ";
@@ -604,9 +602,9 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
     }
 
     // Special case for min/max
-    void generateMinMax(const list<ValueInst*>& args, const string& fun)
+    void generateMinMax(const Values& args, const string& fun)
     {
-        list<ValueInst*>::iterator it;
+        Values::iterator it;
         ValueInst*                 arg1 = *(args.begin());
         arg1->accept(&fTypingVisitor);
         if (isIntType(fTypingVisitor.fCurType)) {

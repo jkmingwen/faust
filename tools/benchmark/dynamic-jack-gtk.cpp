@@ -93,6 +93,7 @@ struct DynamicDSP {
     jackaudio_midi fAudio;
 #else
     coreaudio fAudio;
+    midi_handler* fMidiHandler = nullptr;
 #endif
     string fRCfilename;
     bool is_llvm = false;
@@ -162,7 +163,12 @@ struct DynamicDSP {
                 || (string(argv[i]) == "-httpd")
                 || (string(argv[i]) == "-resample")) {
                 continue;
-            } else if (string(argv[i]) == "-nvoices") {
+            } else if ((string(argv[i]) == "-nvoices")
+                       || (string(argv[i]) == "-port")
+                       || (string(argv[i]) == "-outport")
+                       || (string(argv[i]) == "-errport")
+                       || (string(argv[i]) == "-desthost")
+                       || (string(argv[i]) == "-xmit")) {
                 i++;
                 continue;
             }
@@ -279,8 +285,8 @@ struct DynamicDSP {
         #ifdef JACK
             fMIDIInterface = new MidiUI(&fAudio);
         #else
-            rt_midi midi_handler(name);
-            fMIDIInterface = new MidiUI(&midi_handler);
+            fMidiHandler = new rt_midi(name);
+            fMIDIInterface = new MidiUI(fMidiHandler);
         #endif
             fDSP->buildUserInterface(fMIDIInterface);
         }
@@ -331,6 +337,10 @@ struct DynamicDSP {
         } else {
             deleteInterpreterDSPFactory(static_cast<interpreter_dsp_factory*>(fFactory));
         }
+    #ifdef JACK
+    #else
+        delete fMidiHandler;
+    #endif
     }
         
 };
@@ -367,7 +377,7 @@ static bool runDynamicDSP(int argc, char* argv[], bool is_dsp_only = false)
         // Allocate a new DynamicDSP and start it
         gDynamicDSP = new DynamicDSP(argc, argv, is_dsp_only);
         bool res = gDynamicDSP->start();
-        // 'start' returns either because the DSP file content has changed or the window was closed by the user
+        // blocking 'start' returns either because the DSP file content has changed or the window was closed by the user
         gMutex.lock();
         delete gDynamicDSP;
         gDynamicDSP = nullptr;

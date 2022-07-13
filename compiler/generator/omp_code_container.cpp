@@ -35,8 +35,8 @@ struct StackVarAnalyser : public DispatchVisitor {
         ArrayTyped* array_typed;
 
         // Keep "simple" stack variables and pointers on simple variables (that is everything but arrays)
-        if (inst->fAddress->getAccess() == Address::kStack &&
-            !((array_typed = dynamic_cast<ArrayTyped*>(inst->fType)) && array_typed->fSize > 0)) {
+        if (inst->fAddress->isStack()
+            && !((array_typed = dynamic_cast<ArrayTyped*>(inst->fType)) && array_typed->fSize > 0)) {
             fFirstPrivateTable.push_back(inst->fAddress->getName());
         }
     }
@@ -107,7 +107,7 @@ StatementInst* OpenMPCodeContainer::generateDAGLoopOMP(const string& counter)
     // Generate : int count = min(32, (fullcount - index))
     ValueInst*       init1 = InstBuilder::genLoadFunArgsVar(counter);
     ValueInst*       init2 = InstBuilder::genSub(init1, InstBuilder::genLoadLoopVar(index));
-    list<ValueInst*> min_fun_args;
+    Values min_fun_args;
     min_fun_args.push_back(InstBuilder::genInt32NumInst(gGlobal->gVecSize));
     min_fun_args.push_back(init2);
     ValueInst*      init3     = InstBuilder::genFunCallInst("min", min_fun_args);

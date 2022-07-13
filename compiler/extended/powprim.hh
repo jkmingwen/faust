@@ -20,6 +20,7 @@
  ************************************************************************/
 
 #include <math.h>
+#include <cmath>
 
 #include "Text.hh"
 #include "floats.hh"
@@ -77,24 +78,59 @@ class PowPrim : public xtended {
             } else {
                 return tree(pow(double(n), double(m)));
             }
-        } else if (isNum(args[0], n) && (double(n) == 10.) && gGlobal->gHasExp10) {
-            // pow(10, x) ==> exp10(x)
-            return tree(::symbol("exp10"), args[1]);
+        } else if (isNum(args[1], m)) {
+            if ((double(m) == 10.) && gGlobal->gHasExp10) {
+                // pow(x, 10) ==> exp10(x)
+                return tree(::symbol("exp10"), args[0]);
+            } else if (double(m) == 0.5) {
+                // pow(x, 0.5) ==> sqrt(x)
+                return tree(::symbol("sqrt"), args[0]);
+            } else if (double(m) == 0.25) {
+                // pow(x, 0.25) ==> sqrt(sqrt(x))
+                return tree(::symbol("sqrt"), tree(::symbol("sqrt"), args[0]));
+            }
+        }
+        return tree(symbol(), args[0], args[1]);
+    }
+    
+    // Check that power argument is an integer or possibly represents an integer, up to 32
+    bool isIntPowArg(::Type ty, ValueInst* val_aux, int& pow_arg)
+    {
+        if (ty->nature() == kInt) {
+            Int32NumInst* int_val = dynamic_cast<Int32NumInst*>(val_aux);
+            if (int_val) {
+                pow_arg = int_val->fNum;
+                return (pow_arg <= 32);
+            } else {
+                return false;
+            }
         } else {
-            return tree(symbol(), args[0], args[1]);
+            FloatNumInst* float_val = dynamic_cast<FloatNumInst*>(val_aux);
+            DoubleNumInst* double_val = dynamic_cast<DoubleNumInst*>(val_aux);
+            if (float_val) {
+                pow_arg = int(float_val->fNum);
+                double intpart;
+                return (std::modf(float_val->fNum, &intpart) == 0.) && (pow_arg >= 0) && (pow_arg <= 32);
+            } else if (double_val) {
+                pow_arg = int(double_val->fNum);
+                double intpart;
+                return (std::modf(double_val->fNum, &intpart) == 0.) && (pow_arg >= 0) && (pow_arg <= 32);
+            } else {
+                return false;
+            }
         }
     }
 
-    virtual ValueInst* generateCode(CodeContainer* container, const list<ValueInst*>& args, ::Type result,
+    virtual ValueInst* generateCode(CodeContainer* container, Values& args, ::Type result,
                                     vector<::Type> const& types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());
 
-        vector<Typed::VarType>          arg_types(2);
-        Typed::VarType                  result_type = (result->nature() == kInt) ? Typed::kInt32 : itfloat();
+        vector<Typed::VarType> arg_types(2);
+        Typed::VarType         result_type = (result->nature() == kInt) ? Typed::kInt32 : itfloat();
 
-        list<ValueInst*>::const_iterator it = args.begin();
+        ValuesIt it = args.begin();
         it++;
         Int32NumInst* arg1 = dynamic_cast<Int32NumInst*>(*it);
 
@@ -107,13 +143,13 @@ class PowPrim : public xtended {
             // Expand the pow depending of the exposant argument
             BlockInst* block = InstBuilder::genBlockInst();
             
-            list<ValueInst*>::const_iterator it1 = args.begin();
+            ValuesIt it1 = args.begin();
             it1++;
             
-            Int32NumInst* arg2             = dynamic_cast<Int32NumInst*>(*it1);
-            string        faust_power_name = container->getFaustPowerName() + to_string(arg2->fNum) + ((result_type == Typed::kInt32) ? "_i" : "_f");
+            Int32NumInst* arg2 = dynamic_cast<Int32NumInst*>(*it1);
+            string faust_power_name = container->getFaustPowerName() + to_string(arg2->fNum) + ((result_type == Typed::kInt32) ? "_i" : "_f");
             
-            list<NamedTyped*> named_args;
+            Names named_args;
             named_args.push_back(InstBuilder::genNamedTyped("value", InstBuilder::genBasicTyped(arg_types[0])));
             
             if (arg2->fNum == 0) {
@@ -130,7 +166,7 @@ class PowPrim : public xtended {
                                                                         InstBuilder::genFunTyped(named_args, InstBuilder::genBasicTyped(result_type),
                                                                                                  FunTyped::kLocal), block));
             
-            list<ValueInst*> truncated_args;
+            Values truncated_args;
             truncated_args.push_back((*args.begin()));
             return InstBuilder::genFunCallInst(faust_power_name, truncated_args);
       
@@ -139,8 +175,8 @@ class PowPrim : public xtended {
             arg_types[0] = itfloat();
             arg_types[1] = itfloat();
 
-            list<ValueInst*> casted_args;
-            list<ValueInst*>::const_iterator it2 = args.begin();
+            Values casted_args;
+            ValuesIt it2 = args.begin();
             vector< ::Type>::const_iterator it1;
             
             for (it1 = types.begin(); it1 != types.end(); it1++, it2++) {

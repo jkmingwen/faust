@@ -449,7 +449,7 @@ struct FunctionInliner {
     map<string, string> fVarTable;
 
     BlockInst* ReplaceParameterByArg(BlockInst* code, NamedTyped* named, ValueInst* arg);
-    BlockInst* ReplaceParametersByArgs(BlockInst* code, list<NamedTyped*> args_type, list<ValueInst*> args, bool ismethod);
+    BlockInst* ReplaceParametersByArgs(BlockInst* code, Names args_type, Values args, bool ismethod);
 };
 
 // Replace a function call with the actual inlined function code
@@ -728,6 +728,21 @@ struct ConstantsCopyToMemory1 : public ConstantsCopyMemory {
             return BasicCloneVisitor::visit(inst);
         } else {
             return InstBuilder::genDropInst();
+        }
+    }
+    
+};
+
+// Rewrite DSP array fields as pointers
+struct ArrayToPointer : public BasicCloneVisitor {
+    
+    virtual StatementInst* visit(DeclareVarInst* inst)
+    {
+        ArrayTyped* array_typed = dynamic_cast<ArrayTyped*>(inst->fType);
+        if (array_typed) {
+            return InstBuilder::genDecStructVar(inst->getName(), InstBuilder::genArrayTyped(array_typed->fType->clone(this), 0));
+        } else {
+            return BasicCloneVisitor::visit(inst);
         }
     }
     

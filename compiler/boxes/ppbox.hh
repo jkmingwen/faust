@@ -32,6 +32,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <utility>
 #include <map>
 
 #include "boxes.hh"
@@ -65,7 +66,6 @@ class boxpp : public virtual Garbageable {
 
 class boxppShared : public boxpp {
     protected:
-        static std::map<Tree, std::string> fExpTable;
         
     public:
         boxppShared(Tree b, int p = 0) : boxpp(b, p) {}
