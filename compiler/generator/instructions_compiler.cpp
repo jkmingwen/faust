@@ -44,7 +44,7 @@
 #include "simplify.hh"
 #include "timing.hh"
 #include "xtended.hh"
-#include "sigToSDF.hh"
+#include "signal2SDF.hh"
 
 using namespace std;
 

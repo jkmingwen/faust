@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "exception.hh"
-#include "sigToSDF.hh"
+#include "signal2SDF.hh"
 #include "signals.hh"
 #include "sigtype.hh"
 #include "sigtyperules.hh"
