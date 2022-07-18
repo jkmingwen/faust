@@ -185,18 +185,22 @@ static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actorList,
             actorList.insert(pair<string, Actor>(actorName.str(),
                                                  Actor(actorName.str(), sigLabel(sig))));
             Tree arg1, arg2;
-            int arg2_val;
+            int arg2Val;
             if (isSigDelay(sig, arg1, arg2)) {
-                stringstream arg1_name;
-                stringstream arg2_name;
-                arg1_name << arg1;
-                arg2_name << arg2;
-                delayActors.push_back(actorName.str());
-                if (isSigInt(arg2, &arg2_val)) { // assigns int value to arg2_val
+                stringstream arg1Name;
+                stringstream arg2Name;
+                arg1Name << arg1;
+                arg2Name << arg2;
+                // track constant delays to bypass later
+                if (isSigInt(arg2, &arg2Val)) { // assigns int value to arg2Val
+                  delayActors.push_back(actorName.str());
+                  actorList.at(actorName.str()).setDelayInputSigName(arg1Name.str());
+                  actorList.at(actorName.str()).setArg(arg2Name.str(), arg2Val);
+                } else { // leave variable delays alone; will resolve later
+                  actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
+                  actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
                 }
-                actorList.at(actorName.str()).setDelayInputSigName(arg1_name.str());
-                actorList.at(actorName.str()).setArg(arg2_name.str(), arg2_val);
-            } else if (isSigBinOp(sig, &arg2_val, arg1, arg2)) {
+            } else if (isSigBinOp(sig, &arg2Val, arg1, arg2)) {
               stringstream arg1Name;
               stringstream arg2Name;
               arg1Name << arg1;
