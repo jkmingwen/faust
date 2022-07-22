@@ -558,6 +558,7 @@ struct global {
     string gArchFile;
     bool   gExportDSP;
     bool   gPrintSDFSwitch;
+    bool   gPrintSDFBetaSwitch;
 
     // Source file injection
     bool   gInjectFlag;

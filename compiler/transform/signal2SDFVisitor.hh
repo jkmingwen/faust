@@ -1,0 +1,46 @@
+#include <cstdlib>
+#include "property.hh"
+#include "sigtyperules.hh"
+#include "tree.hh"
+#include "treeTraversal.hh"
+#include "xtended.hh"
+#include "SDF.hh"
+
+//-------------------------Signal2SDFVisitor-------------------------------
+// Compile signal expresssions into SDF representations in XML
+//-------------------------------------------------------------------------
+
+using namespace std;
+
+class Signal2SDFVisitor : public TreeTraversal {
+protected:
+  bool fTraceFlag{false};  // trace transformations when true
+  bool fVisitGen{false};
+  int  fIndent{0};         // current indentation during trace
+  string fMessage;         // trace message
+  set<Tree> fVisited;      // avoid visiting a tree twice
+
+  map<string, Actor> actorList;
+  map<string, Channel> chList;
+  int chCount = 0;
+  int outCount = 0;
+  vector<string> delayActors;
+  vector<string> recActors;
+  vector<string> binopActors;
+
+  void visit(Tree t) override;
+
+public:
+  Signal2SDFVisitor() = default;
+  void self(Tree t);
+  void sigToSDF(Tree t, ofstream& fout);
+  void recLog(Tree sig, set<Tree>& drawn);
+  string chAttr(Type t);
+  string sigLabel(Tree sig);
+  void mergeChannels(string ch1, string ch2);
+  void bypassDelay(string delayActorName, string inputActorName);
+  void bypassRec(string recActorName, vector<string> inputSignalNames);
+  string channelNameFromPort(Port port);
+  string channelNameFromActors(string srcActor, string dstActor);
+  void updateBinopArguments(string oldArg, string newArg);
+};

@@ -44,7 +44,8 @@
 #include "simplify.hh"
 #include "timing.hh"
 #include "xtended.hh"
-#include "signal2SDF.hh"
+// #include "signal2SDF.hh"
+#include "signal2SDFVisitor.hh"
 
 using namespace std;
 
@@ -302,9 +303,14 @@ Tree InstructionsCompiler::prepare(Tree LS)
         V.mapself(L5);
     }
     
-    if (gGlobal->gPrintSDFSwitch) {
-        ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
-        sigToSDF(L5, xmlfile);
+    // if (gGlobal->gPrintSDFSwitch) {
+    //     ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
+    //     sigToSDF(L5, xmlfile);
+    // }
+    if (gGlobal->gPrintSDFBetaSwitch) {
+      Signal2SDFVisitor V;
+      ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
+      V.sigToSDF(L5, xmlfile);
     }
     return L5;
 }

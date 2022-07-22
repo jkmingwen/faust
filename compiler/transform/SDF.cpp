@@ -256,5 +256,5 @@ void Channel::printInfo()
     cout << "\tDest Port: " << this->getDstPort() << endl;
     cout << "\tSrcActor: " << this->getSrcActor() << endl;
     cout << "\tDstActor: " << this->getDstActor() << endl;
-    
+
 }
