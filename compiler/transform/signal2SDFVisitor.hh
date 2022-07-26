@@ -43,4 +43,5 @@ public:
   string channelNameFromPort(Port port);
   string channelNameFromActors(string srcActor, string dstActor);
   void updateBinopArguments(string oldArg, string newArg);
+  void addChannel(Tree sig);
 };

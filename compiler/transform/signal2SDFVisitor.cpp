@@ -21,8 +21,8 @@ void Signal2SDFVisitor::sigToSDF(Tree L, ofstream& fout)
     const string graphName = gGlobal->gMasterName; // name of .dsp file
     set<Tree> alreadyDrawn;
     while (!isNil(L)) {
-      // self(hd(L));
-      recLog(hd(L), alreadyDrawn);
+      self(hd(L));
+      // recLog(hd(L), alreadyDrawn);
       // add output node (and related ports/channels) to relevant lists
       string outName("OUTPUT_" + to_string(outCount));
       actorList.insert(pair<string, Actor>(outName,
@@ -278,38 +278,105 @@ void Signal2SDFVisitor::visit(Tree sig)
 {
     int    i;
     double r;
+    vector<Tree> subsig;
     Tree   c, sel, x, y, z, u, v, var, le, label, id, ff, largs, type, name, file, sf;
 
-    const string graphName = gGlobal->gMasterName; // name of .dsp file
-
-    if (getUserData(sig)) {
+    xtended* p = (xtended*)getUserData(sig);
+    if (isList(sig)) {
+        do {
+            self(hd(sig));
+            sig = tl(sig);
+        } while (isList(sig));
+    } else if (p) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         for (Tree b : sig->branches()) {
             self(b);
         }
         return;
     } else if (isSigInt(sig, &i)) {
+        // Add actor to list of actors
+        stringstream actorName; // workaround to get unique actor names from signal
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         return;
     } else if (isSigReal(sig, &r)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         return;
     } else if (isSigWaveform(sig)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         return;
     } else if (isSigInput(sig, &i)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         return;
     } else if (isSigOutput(sig, &i, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         self(x);
         return;
     } else if (isSigDelay1(sig, x)) {
         self(x);
         return;
     } else if (isSigDelay(sig, x, y)) {
-        self(x);
-        self(y);
-        return;
+      stringstream arg1Name;
+      stringstream arg2Name;
+      stringstream actorName;
+      actorName << sig;
+      actorList.insert(pair<string, Actor>(actorName.str(),
+                                           Actor(actorName.str(), sigLabel(sig))));
+      addChannel(sig);
+      arg1Name << x;
+      arg2Name << y;
+      // NOTE assume here that fixed delays will only have Int argument, might need to expand to include Real values
+      if (isSigInt(y, &i)) { // fixed delay: track delay length to model later
+          delayActors.push_back(actorName.str());
+          actorList.at(actorName.str()).setDelayInputSigName(arg1Name.str());
+          actorList.at(actorName.str()).setArg(arg2Name.str(), i);
+      } else { // variable delay: leave alone; will resolve later
+          actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
+          actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
+      }
+      self(x);
+      self(y);
+      return;
     } else if (isSigPrefix(sig, x, y)) {
         self(x);
         self(y);
         return;
     } else if (isSigBinOp(sig, &i, x, y)) {
+        stringstream arg1Name;
+        stringstream arg2Name;
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
+        arg1Name << x;
+        arg2Name << y;
+        // track order of arguments for binary operators
+        binopActors.push_back(actorName.str());
+        actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
+        actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
         self(x);
         self(y);
         return;
@@ -327,15 +394,30 @@ void Signal2SDFVisitor::visit(Tree sig)
 
     // Tables
     else if (isSigTable(sig, id, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         return;
     } else if (isSigWRTbl(sig, id, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         self(z);
         return;
     } else if (isSigRDTbl(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         return;
@@ -343,16 +425,31 @@ void Signal2SDFVisitor::visit(Tree sig)
 
     // Doc
     else if (isSigDocConstantTbl(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         return;
     } else if (isSigDocWriteTbl(sig, x, y, u, v)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         self(u);
         self(v);
         return;
     } else if (isSigDocAccessTbl(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x);
         self(y);
         return;
@@ -360,6 +457,11 @@ void Signal2SDFVisitor::visit(Tree sig)
 
     // Select2 (and Select3 expressed with Select2)
     else if (isSigSelect2(sig, sel, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(sel);
         self(x);
         self(y);
@@ -378,66 +480,153 @@ void Signal2SDFVisitor::visit(Tree sig)
 
     // recursive signals
     else if (isProj(sig, &i, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         self(x);
         return;
     } else if (isRec(sig, var, le)) {
-        mapself(le);
+        stringstream actorName;
+        stringstream inputSigName;
+        actorName << sig;
+        inputSigName << hd(le);
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
+        recActors.push_back(actorName.str());
+        actorList.at(actorName.str()).addInputSignalName(inputSigName.str());
+        self(le);
         return;
     }
 
     // Int and Float Cast
     else if (isSigIntCast(sig, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         self(x);
         return;
     } else if (isSigFloatCast(sig, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
         self(x);
         return;
     }
 
     // UI
     else if (isSigButton(sig, label)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         return;
     } else if (isSigCheckbox(sig, label)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         return;
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
-        self(c), self(x), self(y), self(z);
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        addChannel(sig);
+        // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigHSlider(sig, label, c, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigNumEntry(sig, label, c, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigVBargraph(sig, label, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x), self(y), self(z);
         return;
     } else if (isSigHBargraph(sig, label, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
+        // addChannel(sig);
         self(x), self(y), self(z);
         return;
     }
 
     // Soundfile length, rate, buffer
     else if (isSigSoundfile(sig, label)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         return;
     } else if (isSigSoundfileLength(sig, sf, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(sf), self(x);
         return;
     } else if (isSigSoundfileRate(sig, sf, x)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(sf), self(x);
         return;
     } else if (isSigSoundfileBuffer(sig, sf, x, y, z)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(sf), self(x), self(y), self(z);
         return;
     }
 
     // Attach, Enable, Control
     else if (isSigAttach(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(x), self(y);
         return;
     } else if (isSigEnable(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(x), self(y);
         return;
     } else if (isSigControl(sig, x, y)) {
+        stringstream actorName;
+        actorName << sig;
+        actorList.insert(pair<string, Actor>(actorName.str(),
+                                             Actor(actorName.str(), sigLabel(sig))));
         self(x), self(y);
         return;
     }
@@ -454,15 +643,14 @@ void Signal2SDFVisitor::visit(Tree sig)
 
 void Signal2SDFVisitor::self(Tree t)
 {
-  if (fTraceFlag) TreeTraversal::traceEnter(t);
-  fIndent++;
-
+  // if (fTraceFlag) TreeTraversal::traceEnter(t);
+  // fIndent++;
   if (!fVisited.count(t)) {
     fVisited.insert(t);
     visit(t);
   }
-  fIndent--;
-  if (fTraceFlag) TreeTraversal::traceExit(t);
+  // fIndent--;
+  // if (fTraceFlag) TreeTraversal::traceExit(t);
 }
 
 /**
@@ -693,4 +881,47 @@ void Signal2SDFVisitor::updateBinopArguments(string oldArg, string newArg) {
       }
     }
   }
+}
+
+void Signal2SDFVisitor::addChannel(Tree sig) {
+    vector<Tree> subsig;
+    int n = getSubSignals(sig, subsig);
+    if (n > 0) {
+        if (n == 1 && isList(subsig[0])) {
+            Tree id, body;
+            faustassert(isRec(sig, id, body));
+            Tree L = subsig[0];
+            subsig.clear();
+            n = 0;
+            do {
+                subsig.push_back(hd(L));
+                L = tl(L);
+                n += 1;
+            } while (isList(L));
+        }
+
+        for (int i = 0; i < n; i++) {
+            self(subsig[i]);
+            // log channels and corresponding ports for the connected actors
+            string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
+            stringstream srcActor;
+            stringstream dstActor;
+            srcActor << subsig[i];
+            dstActor << sig;
+            string srcPortName("in_" + chName);
+            string dstPortName("out_" + chName);
+            actorList.at(srcActor.str()).addPort(Port(srcPortName,
+                                                      portType::out,
+                                                      1));
+            actorList.at(dstActor.str()).addPort(Port(dstPortName,
+                                                      portType::in,
+                                                      1));
+            chList.insert(pair<string, Channel>(chName,
+                                                Channel(chName,
+                                                        srcActor.str(), srcPortName,
+                                                        dstActor.str(), dstPortName,
+                                                        1, 0)));
+            chCount++;
+        }
+    }
 }
