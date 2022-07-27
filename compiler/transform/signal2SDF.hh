@@ -44,4 +44,8 @@ public:
   string channelNameFromActors(string srcActor, string dstActor);
   void updateBinopArguments(string oldArg, string newArg);
   void addChannel(Tree sig);
+  void logActor(Tree sig, string type);
+  void logDelayActor(Tree sig, Tree x, Tree y, string type);
+  void logRecActor(Tree sig, Tree le, string type);
+  void logBinopActor(Tree sig, Tree x, Tree y, string type);
 };
