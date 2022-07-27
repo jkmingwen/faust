@@ -498,10 +498,6 @@ static bool processCmdline(int argc, const char* argv[])
             gGlobal->gPrintSDFSwitch = true;
             i += 1;
 
-        } else if (isCmd(argv[i], "-sdfBeta", "--sdf3Beta")) {
-            gGlobal->gPrintSDFBetaSwitch = true;
-            i += 1;
-
             // 'real' options
         } else if (isCmd(argv[i], "-single", "--single-precision-floats")) {
             if (float_size && gGlobal->gFloatSize != 1) {

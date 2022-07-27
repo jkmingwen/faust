@@ -1,34 +1,47 @@
-#ifndef SIGTOSDF_HH
-#define SIGTOSDF_HH
-
-#include <fstream>
-#include <iostream>
-#include <string>
-#include "signals.hh"
-#include "sigtype.hh"
+#include <cstdlib>
+#include "property.hh"
+#include "sigtyperules.hh"
+#include "tree.hh"
+#include "treeTraversal.hh"
+#include "xtended.hh"
 #include "SDF.hh"
+
+//-------------------------Signal2SDF-------------------------------
+// Compile signal expresssions into SDF representations in XML
+//------------------------------------------------------------------
 
 using namespace std;
 
-/**
- * Draw a list of signals L as a synchronous dataflow graph using
- * SDF3-compatible XML format
- */
-void sigToSDF(Tree L, ofstream& fout);
-static void recLog(Tree sig, set<Tree>& drawn, map<string, Actor>& actors,
-                   map<string, Channel>& channels, int& chCount,
-                   vector<string>& delayList, vector<string>& recList,
-                   vector<string>& binopList); // store delay ('@'), recursive ('REC WN'), and binary operator actors in their own vectors
-static string chAttr(Type t);
-static string sigLabel(Tree sig);
-void mergeChannels(string ch1, string ch2, map<string, Channel>& chList);
-void bypassDelay(string delayActorName, string inputActorName,
-                 map<string, Channel>& chList, map<string, Actor>& actorList);
-void bypassRec(string recActorName, vector<string> inputSignalNames,
-               map<string, Channel>& chList, map<string, Actor>& actorList);
-string channelNameFromPort(Port port, map<string, Channel>& chList);
-string channelNameFromActors(string srcActor, string dstActor,
-                             map<string, Channel>& chList);
-void updateBinopArguments(string oldArg, string newArg, vector<string>& binopList,
-                          map<string, Actor>& actorList, map<string, Channel>& chList);
-#endif  // SIGTOSDF_HH
+class Signal2SDF : public TreeTraversal {
+protected:
+  bool fTraceFlag{false};  // trace transformations when true
+  bool fVisitGen{false};
+  int  fIndent{0};         // current indentation during trace
+  string fMessage;         // trace message
+  set<Tree> fVisited;      // avoid visiting a tree twice
+
+  map<string, Actor> actorList;
+  map<string, Channel> chList;
+  int chCount = 0;
+  int outCount = 0;
+  vector<string> delayActors;
+  vector<string> recActors;
+  vector<string> binopActors;
+
+  void visit(Tree t) override;
+
+public:
+  Signal2SDF() = default;
+  void self(Tree t);
+  void sigToSDF(Tree t, ofstream& fout);
+  void recLog(Tree sig, set<Tree>& drawn);
+  string chAttr(Type t);
+  string sigLabel(Tree sig);
+  void mergeChannels(string ch1, string ch2);
+  void bypassDelay(string delayActorName, string inputActorName);
+  void bypassRec(string recActorName, vector<string> inputSignalNames);
+  string channelNameFromPort(Port port);
+  string channelNameFromActors(string srcActor, string dstActor);
+  void updateBinopArguments(string oldArg, string newArg);
+  void addChannel(Tree sig);
+};
