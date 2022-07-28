@@ -34,9 +34,7 @@ public:
   Signal2SDF() = default;
   void self(Tree t);
   void sigToSDF(Tree t, ofstream& fout);
-  void recLog(Tree sig, set<Tree>& drawn);
   string chAttr(Type t);
-  string sigLabel(Tree sig);
   void mergeChannels(string ch1, string ch2);
   void bypassDelay(string delayActorName, string inputActorName);
   void bypassRec(string recActorName, vector<string> inputSignalNames);

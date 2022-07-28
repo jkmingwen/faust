@@ -146,134 +146,19 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
 }
 
 /**
- * Recursively traverse signal and log actors, channels, and ports
+ * translate signal binary operations into strings
  */
-void Signal2SDF::recLog(Tree sig, set<Tree>& drawn)
-{
-    vector<Tree> subsig;
-    int          n;
+static const char* binopname[] = {
+  "add", "diff", "prod", "div", "mod", "l_shift",
+  "r_shift", "greaterthan", "lessthan", "geq",
+  "leq", "equal", "notequal", "AND", "OR", "XOR"
+};
 
-    if (drawn.count(sig) == 0) {
-        drawn.insert(sig);
-        if (isList(sig)) {
-            do {
-                recLog(hd(sig), drawn);
-                sig = tl(sig);
-            } while (isList(sig));
-        } else {
-            // Add actor to list of actors
-            stringstream actorName; // workaround to get unique actor names from signal
-            actorName << sig;
-            actorList.insert(pair<string, Actor>(actorName.str(),
-                                                 Actor(actorName.str(), sigLabel(sig))));
-            Tree arg1, arg2;
-            int arg2Val;
-            if (isSigDelay(sig, arg1, arg2)) {
-                stringstream arg1Name;
-                stringstream arg2Name;
-                arg1Name << arg1;
-                arg2Name << arg2;
-                // track constant delays to bypass later
-                if (isSigInt(arg2, &arg2Val)) { // assigns int value to arg2Val
-                  delayActors.push_back(actorName.str());
-                  actorList.at(actorName.str()).setDelayInputSigName(arg1Name.str());
-                  actorList.at(actorName.str()).setArg(arg2Name.str(), arg2Val);
-                } else { // leave variable delays alone; will resolve later
-                  actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
-                  actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
-                }
-            } else if (isSigBinOp(sig, &arg2Val, arg1, arg2)) {
-              stringstream arg1Name;
-              stringstream arg2Name;
-              arg1Name << arg1;
-              arg2Name << arg2;
-              cout << actorName.str() << " order of args:\n"
-                   << "\t1. " << arg1Name.str() << "\n"
-                   << "\t2. " << arg2Name.str() << endl;
-              // track order of arguments for binary operators
-              binopActors.push_back(actorName.str());
-              actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
-              actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
-            }
 
-            // draw the subsignals
-            n = getSubSignals(sig, subsig);
-            if (n > 0) {
-                if (n == 1 && isList(subsig[0])) {
-                    Tree id, body;
-                    faustassert(isRec(sig, id, body));
-                    if (isRec(sig, id, body)) {
-                      recActors.push_back(actorName.str());
-                      for (auto& b : body->branches()) {
-                        if (b->node() == "cons") { // NOTE when one input of REC WN is delay, the other is a node "cons" --- need to check branches of cons to retrieve name of input actor
-                          for (auto& next : b->branches()) {
-                            // NOTE found that each input signal of a REC WN
-                            // operator is accompanied by a node with the following
-                            // properties: arity = 0, serial = 35, node = nil
-                            // cout << "\tnode: " << next->node() << endl;
-                            // don't add "nil" nodes
-                            if (next->arity() != 0 && next->serial() != 35 && next->node() != "nil" && next->node() != "cons") {
-                              stringstream sigName;
-                              sigName << next;
-                              actorList.at(actorName.str()).addInputSignalName(sigName.str());
-                            } else if (next->node() == "cons") { // TODO implement this recursively to support nested REC WN
-                              cout << "recursion with variable delays as input not currently supported: error in output" << endl;
-                            }
-                          }
-                        } else {
-                          // only add input signals that aren't 'nil' signals
-                          if (b->arity() != 0 && b->serial() != 35 && b->node() != "nil") {
-                            stringstream sigName;
-                            sigName << b;
-                            // cout << "Adding " << sigName.str() << " as input signal of " << actorName.str() << endl;
-                            // cout << "\tnode: " << b->node() << endl;
-                            actorList.at(actorName.str()).addInputSignalName(sigName.str());
-                          }
-                        }
-                      }
-                    } else {
-                    }
-                    // special recursion case, recreate a vector of subsignals instead of the
-                    // list provided by getSubSignal
-                    Tree L = subsig[0];
-                    subsig.clear();
-                    n = 0;
-                    do {
-                        subsig.push_back(hd(L));
-                        L = tl(L);
-                        n += 1;
-                    } while (isList(L));
-                }
-
-                for (int i = 0; i < n; i++) {
-                    recLog(subsig[i], drawn);
-                    // log channels and corresponding ports for the connected actors
-                    string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(subsig[i])));
-                    stringstream srcActor;
-                    stringstream dstActor;
-                    srcActor << subsig[i];
-                    dstActor << sig;
-                    string srcPortName("in_" + chName);
-                    string dstPortName("out_" + chName);
-                    actorList.at(srcActor.str()).addPort(Port(srcPortName,
-                                                              portType::out,
-                                                              1));
-                    actorList.at(dstActor.str()).addPort(Port(dstPortName,
-                                                              portType::in,
-                                                              1));
-                    chList.insert(pair<string, Channel>(chName,
-                                                        Channel(chName,
-                                                                srcActor.str(), srcPortName,
-                                                                dstActor.str(), dstPortName,
-                                                                1, 0)));
-                    chCount++;
-                }
-            }
-        }
-    }
-}
-
-// traverse tree and perform various actions depending on type of signal detected
+/**
+ * traverse tree and perform various actions depending
+ * on the type of signal detected
+ */
 void Signal2SDF::visit(Tree sig)
 {
     int    i;
@@ -294,35 +179,37 @@ void Signal2SDF::visit(Tree sig)
         }
         return;
     } else if (isSigInt(sig, &i)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, to_string(i));
         return;
     } else if (isSigReal(sig, &r)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, to_string(r));
         return;
     } else if (isSigWaveform(sig)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "waveform");
         return;
     } else if (isSigInput(sig, &i)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "INPUT_" + to_string(i));
         return;
     } else if (isSigOutput(sig, &i, x)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "OUTPUT_" + to_string(i));
         self(x);
         return;
     } else if (isSigDelay1(sig, x)) {
+        logActor(sig, "mem");
         self(x);
         return;
     } else if (isSigDelay(sig, x, y)) {
-        logDelayActor(sig, x, y, sigLabel(sig));
+        logDelayActor(sig, x, y, "delay");
         self(x);
         self(y);
       return;
     } else if (isSigPrefix(sig, x, y)) {
+        logActor(sig, "prefix");
         self(x);
         self(y);
         return;
     } else if (isSigBinOp(sig, &i, x, y)) {
-        logBinopActor(sig, x, y, sigLabel(sig));
+        logBinopActor(sig, x, y, binopname[i]);
         self(x);
         self(y);
         return;
@@ -340,18 +227,22 @@ void Signal2SDF::visit(Tree sig)
 
     // Tables
     else if (isSigTable(sig, id, x, y)) {
-        logActor(sig, sigLabel(sig));
+        stringstream fout;
+        fout << "table: " << id;
+        logActor(sig, fout.str());
         self(x);
         self(y);
         return;
     } else if (isSigWRTbl(sig, id, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        stringstream fout;
+        fout << "write: " << id;
+        logActor(sig, fout.str());
         self(x);
         self(y);
         self(z);
         return;
     } else if (isSigRDTbl(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "read");
         self(x);
         self(y);
         return;
@@ -359,19 +250,16 @@ void Signal2SDF::visit(Tree sig)
 
     // Doc
     else if (isSigDocConstantTbl(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
         self(x);
         self(y);
         return;
     } else if (isSigDocWriteTbl(sig, x, y, u, v)) {
-        logActor(sig, sigLabel(sig));
         self(x);
         self(y);
         self(u);
         self(v);
         return;
     } else if (isSigDocAccessTbl(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
         self(x);
         self(y);
         return;
@@ -379,7 +267,7 @@ void Signal2SDF::visit(Tree sig)
 
     // Select2 (and Select3 expressed with Select2)
     else if (isSigSelect2(sig, sel, x, y)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "select2");
         self(sel);
         self(x);
         self(y);
@@ -389,7 +277,7 @@ void Signal2SDF::visit(Tree sig)
     // Table sigGen
     else if (isSigGen(sig, x)) {
         if (fVisitGen) {
-            logActor(sig, sigLabel(sig));
+            logActor(sig, "generator");
             self(x);
             return;
         } else {
@@ -399,84 +287,80 @@ void Signal2SDF::visit(Tree sig)
 
     // recursive signals
     else if (isProj(sig, &i, x)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "Proj");
         self(x);
         return;
     } else if (isRec(sig, var, le)) {
-        logRecActor(sig, le, sigLabel(sig));
+        stringstream fout;
+        fout << "REC " << *var;
+        logRecActor(sig, le, fout.str());
         self(le);
         return;
     }
 
     // Int and Float Cast
     else if (isSigIntCast(sig, x)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "int");
         self(x);
         return;
     } else if (isSigFloatCast(sig, x)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "float");
         self(x);
         return;
     }
 
     // UI
     else if (isSigButton(sig, label)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "button");
         return;
     } else if (isSigCheckbox(sig, label)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "checkbox");
         return;
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "vslider");
         // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigHSlider(sig, label, c, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "hslider");
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigNumEntry(sig, label, c, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "nentry");
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigVBargraph(sig, label, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "vbargraph");
         self(x), self(y), self(z);
         return;
     } else if (isSigHBargraph(sig, label, x, y, z)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "hbargraph");
         self(x), self(y), self(z);
         return;
     }
 
     // Soundfile length, rate, buffer
     else if (isSigSoundfile(sig, label)) {
-        logActor(sig, sigLabel(sig));
         return;
     } else if (isSigSoundfileLength(sig, sf, x)) {
-        logActor(sig, sigLabel(sig));
         self(sf), self(x);
         return;
     } else if (isSigSoundfileRate(sig, sf, x)) {
-        logActor(sig, sigLabel(sig));
         self(sf), self(x);
         return;
     } else if (isSigSoundfileBuffer(sig, sf, x, y, z)) {
-        logActor(sig, sigLabel(sig));
         self(sf), self(x), self(y), self(z);
         return;
     }
 
     // Attach, Enable, Control
     else if (isSigAttach(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
+        logActor(sig, "attach");
         self(x), self(y);
         return;
     } else if (isSigEnable(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
         self(x), self(y);
         return;
     } else if (isSigControl(sig, x, y)) {
-        logActor(sig, sigLabel(sig));
         self(x), self(y);
         return;
     }
@@ -493,14 +377,10 @@ void Signal2SDF::visit(Tree sig)
 
 void Signal2SDF::self(Tree t)
 {
-  // if (fTraceFlag) TreeTraversal::traceEnter(t);
-  // fIndent++;
   if (!fVisited.count(t)) {
     fVisited.insert(t);
     visit(t);
   }
-  // fIndent--;
-  // if (fTraceFlag) TreeTraversal::traceExit(t);
 }
 
 /**
@@ -532,127 +412,8 @@ string Signal2SDF::chAttr(Type t)
 }
 
 /**
- * translate signal binary operations into strings
+ * Combine two channels in channel list
  */
-static const char* binopname[] = {
-  "add", "diff", "prod", "div", "mod", "l_shift",
-  "r_shift", "greaterthan", "lessthan", "geq",
-  "leq", "equal", "notequal", "AND", "OR", "XOR"
-};
-
-/**
- * return the label of a signal as a string
- */
-string Signal2SDF::sigLabel(Tree sig)
-{
-    int    i;
-    double r;
-    Tree   x, y, z, c, type, name, file, ff, largs, id, le, sel, var, label;
-
-    xtended* p = (xtended*)getUserData(sig);
-
-    stringstream fout;
-
-    if (p) {
-        fout << p->name();
-    } else if (isSigInt(sig, &i)) {
-        fout << i;
-    } else if (isSigReal(sig, &r)) {
-        fout << r;
-    } else if (isSigWaveform(sig)) {
-        fout << "waveform";
-    }
-
-    else if (isSigInput(sig, &i)) {
-        fout << "INPUT_" << i;
-    }
-    // else if ( isSigOutput(sig, &i, x) )             { fout << "OUTPUT_" << i; }
-
-    else if (isSigDelay1(sig, x)) {
-        fout << "mem";
-    } else if (isSigDelay(sig, x, y)) {
-        fout << "delay";
-    } else if (isSigPrefix(sig, x, y)) {
-        fout << "prefix";
-    } else if (isSigBinOp(sig, &i, x, y)) {
-        fout << binopname[i];
-    } else if (isSigFFun(sig, ff, largs)) {
-        fout << "ffunction:" << *ff;
-    } else if (isSigFConst(sig, type, name, file)) {
-        fout << *name;
-    } else if (isSigFVar(sig, type, name, file)) {
-        fout << *name;
-    }
-
-    else if (isSigTable(sig, id, x, y)) {
-        fout << "table:" << id;
-    } else if (isSigWRTbl(sig, id, x, y, z)) {
-        fout << "write:" << id;
-    } else if (isSigRDTbl(sig, x, y)) {
-        fout << "read";
-    }
-
-    else if (isSigSelect2(sig, sel, x, y)) {
-        fout << "select2";
-    }
-
-    else if (isSigGen(sig, x)) {
-        fout << "generator";
-    }
-
-    else if (isProj(sig, &i, x)) {
-        fout << "Proj";
-    } else if (isRec(sig, var, le)) {
-        fout << "REC " << *var;
-    }
-
-    else if (isSigIntCast(sig, x)) {
-        fout << "int";
-    } else if (isSigFloatCast(sig, x)) {
-        fout << "float";
-    }
-#if 0
-    else if ( isSigButton(sig, label) )                         { fout << "button \"" << *label << '"'; }
-    else if ( isSigCheckbox(sig, label) )                       { fout << "checkbox \"" << *label << '"'; }
-    else if ( isSigVSlider(sig, label,c,x,y,z) )	{ fout << "vslider \"" << *label << '"';  }
-    else if ( isSigHSlider(sig, label,c,x,y,z) )	{ fout << "hslider \"" << *label << '"';  }
-    else if ( isSigNumEntry(sig, label,c,x,y,z) )	{ fout << "nentry \"" << *label << '"';  }
-
-    else if ( isSigVBargraph(sig, label,x,y,z) )	{ fout << "vbargraph \"" << *label << '"';      }
-    else if ( isSigHBargraph(sig, label,x,y,z) )	{ fout << "hbargraph \"" << *label << '"';      }
-#else
-    else if (isSigButton(sig, label)) {
-        fout << "button";
-    } else if (isSigCheckbox(sig, label)) {
-        fout << "checkbox";
-    } else if (isSigVSlider(sig, label, c, x, y, z)) {
-        fout << "vslider";
-    } else if (isSigHSlider(sig, label, c, x, y, z)) {
-      fout << "hslider" << "_" << *c;
-    } else if (isSigNumEntry(sig, label, c, x, y, z)) {
-        fout << "nentry";
-    }
-
-    else if (isSigVBargraph(sig, label, x, y, z)) {
-        fout << "vbargraph";
-    } else if (isSigHBargraph(sig, label, x, y, z)) {
-        fout << "hbargraph";
-    }
-#endif
-    else if (isSigAttach(sig, x, y)) {
-        fout << "attach";
-    }
-
-    else {
-        stringstream error;
-        error << "ERROR : unrecognized signal : " << *sig << endl;
-        throw faustexception(error.str());
-    }
-
-    return fout.str();
-}
-
-// combine two channels in channel list
 void Signal2SDF::mergeChannels(string ch1, string ch2)
 {
     chList.at(ch1).setDstActor(chList.at(ch2).getDstActor());
@@ -661,7 +422,9 @@ void Signal2SDF::mergeChannels(string ch1, string ch2)
     chList.erase(chList.find(ch2));
 }
 
-// modify a channel to bypass the given delay actor
+/**
+ * Modify a channel to bypass the given delay actor
+ */
 void Signal2SDF::bypassDelay(string delayActorName, string inputActorName)
 {
     int delayArg = actorList.at(delayActorName).getArg().second;
@@ -676,7 +439,9 @@ void Signal2SDF::bypassDelay(string delayActorName, string inputActorName)
     }
 }
 
-// modify a channel to bypass the given REC actor
+/**
+ * Modify a channel to bypass the given REC actor
+ */
 void Signal2SDF::bypassRec(string recActorName, vector<string> inputSignalNames) {
   vector<Port> outputPorts;
   for (auto& p : actorList.at(recActorName).getPorts()) {
@@ -693,7 +458,9 @@ void Signal2SDF::bypassRec(string recActorName, vector<string> inputSignalNames)
   }
 }
 
-// identify channel name based on an input or output port
+/**
+ * Identify channel name based on an input or output port
+ */
 string Signal2SDF::channelNameFromPort(Port port)
 {
     for (auto& c : chList) {
@@ -710,7 +477,9 @@ string Signal2SDF::channelNameFromPort(Port port)
     return "ERROR: no matching channel";
 }
 
-// identify name of channel between two actors
+/**
+ * Identify name of channel between two actors
+ */
 string Signal2SDF::channelNameFromActors(string srcActor, string dstActor)
 {
     for (auto& c : chList) {
@@ -721,7 +490,9 @@ string Signal2SDF::channelNameFromActors(string srcActor, string dstActor)
     return "ERROR no matching channel";
 }
 
-// update argument actor names of binary operators if they have changed
+/**
+ * Update argument actor names of binary operators if they have changed
+ */
 void Signal2SDF::updateBinopArguments(string oldArg, string newArg) {
   for (auto& op : binopActors) {
     vector<string> argNames = (actorList.at(op)).getInputSignalNames();
@@ -733,8 +504,10 @@ void Signal2SDF::updateBinopArguments(string oldArg, string newArg) {
   }
 }
 
-// add output channels from sig to channel list, along with the corresponding
-// ports on the source and destination actors
+/**
+ * Add output channels from sig to channel list, along with the corresponding
+ * ports on the source and destination actors
+ */
 void Signal2SDF::addChannel(Tree sig) {
     vector<Tree> subsig;
     int n = getSubSignals(sig, subsig);
@@ -778,7 +551,9 @@ void Signal2SDF::addChannel(Tree sig) {
     }
 }
 
-// add the actor associated with sig to the actor list
+/**
+ * Add the actor associated with sig to the actor list
+ */
 void Signal2SDF::logActor(Tree sig, string type) {
     stringstream actorName; // get unique actor names from signal
     actorName << sig;
@@ -787,6 +562,9 @@ void Signal2SDF::logActor(Tree sig, string type) {
     addChannel(sig);
 }
 
+/**
+ * Add the actor associated with sig to the actor list
+ */
 void Signal2SDF::logDelayActor(Tree sig, Tree x, Tree y, string type) {
     stringstream actorName;
     stringstream arg1Name;
@@ -796,7 +574,7 @@ void Signal2SDF::logDelayActor(Tree sig, Tree x, Tree y, string type) {
     arg1Name << x;
     arg2Name << y;
     actorList.insert(pair<string, Actor>(actorName.str(),
-                                         Actor(actorName.str(), sigLabel(sig))));
+                                         Actor(actorName.str(), type)));
     // NOTE assume here that fixed delays will only have Int argument, might need to expand to include Real values
     if (isSigInt(y, &i)) { // fixed delay: track delay length to model later
         delayActors.push_back(actorName.str());
@@ -809,18 +587,26 @@ void Signal2SDF::logDelayActor(Tree sig, Tree x, Tree y, string type) {
     addChannel(sig);
 }
 
+/**
+ * Add the recursive actor associated with sig to the actor list
+ * and recursive actor list
+ */
 void Signal2SDF::logRecActor(Tree sig, Tree le, string type) {
     stringstream actorName;
     stringstream inputSigName;
     actorName << sig;
     inputSigName << hd(le);
     actorList.insert(pair<string, Actor>(actorName.str(),
-                                         Actor(actorName.str(), sigLabel(sig))));
+                                         Actor(actorName.str(), type)));
     recActors.push_back(actorName.str());
     actorList.at(actorName.str()).addInputSignalName(inputSigName.str());
     addChannel(sig);
 }
 
+/**
+ * Add the binary actor associated with sig to the actor list
+ * and track the orger of execution
+ */
 void Signal2SDF::logBinopActor(Tree sig, Tree x, Tree y, string type) {
     stringstream actorName;
     stringstream arg1Name;
@@ -829,7 +615,7 @@ void Signal2SDF::logBinopActor(Tree sig, Tree x, Tree y, string type) {
     arg1Name << x;
     arg2Name << y;
     actorList.insert(pair<string, Actor>(actorName.str(),
-                                         Actor(actorName.str(), sigLabel(sig))));
+                                         Actor(actorName.str(), type)));
     // track order of arguments for binary operators
     binopActors.push_back(actorName.str());
     actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
