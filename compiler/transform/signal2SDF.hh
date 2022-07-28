@@ -46,4 +46,5 @@ public:
   void logDelayActor(Tree sig, Tree x, Tree y, string type);
   void logRecActor(Tree sig, Tree le, string type);
   void logBinopActor(Tree sig, Tree x, Tree y, string type);
+  void logUIActor(Tree sig, Tree init);
 };

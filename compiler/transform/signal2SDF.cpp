@@ -317,15 +317,15 @@ void Signal2SDF::visit(Tree sig)
         logActor(sig, "checkbox");
         return;
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
-        logActor(sig, "vslider");
+        logUIActor(sig, c);
         // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigHSlider(sig, label, c, x, y, z)) {
-        logActor(sig, "hslider");
-        self(c), self(x), self(y), self(z);
+        logUIActor(sig, c);
+        // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigNumEntry(sig, label, c, x, y, z)) {
-        logActor(sig, "nentry");
+        logUIActor(sig, c);
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigVBargraph(sig, label, x, y, z)) {
@@ -621,4 +621,21 @@ void Signal2SDF::logBinopActor(Tree sig, Tree x, Tree y, string type) {
     actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
     actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
     addChannel(sig);
+}
+
+/**
+ * Replace UI component with a constant component of equal to its initial value
+ */
+void Signal2SDF::logUIActor(Tree sig, Tree init) {
+    int i;
+    double r;
+    if (isSigInt(init, &i)) {
+        logActor(sig, to_string(i));
+    } else if (isSigReal(init, &r)) {
+        logActor(sig, to_string(r));
+    } else {
+        stringstream error;
+        error << __FILE__ << ":" << __LINE__ << " ERROR : init value for UI component not found : " << *sig << endl;
+        throw faustexception(error.str());
+    }
 }
