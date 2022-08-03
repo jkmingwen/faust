@@ -21,31 +21,31 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
     const string graphName = gGlobal->gMasterName; // name of .dsp file
     set<Tree> alreadyDrawn;
     while (!isNil(L)) {
-      self(hd(L));
-      // recLog(hd(L), alreadyDrawn);
-      // add output node (and related ports/channels) to relevant lists
-      string outName("OUTPUT_" + to_string(outCount));
-      actorList.insert(pair<string, Actor>(outName,
-                                           Actor(outName, outName)));
-      stringstream srcActor;
-      srcActor << hd(L);
-      string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(hd(L))));
-      string srcPortName("in_" + chName);
-      string dstPortName("out_" + chName);
-      actorList.at(srcActor.str()).addPort(Port(srcPortName,
-                                                portType::out,
-                                                1));
-      actorList.at(outName).addPort(Port(dstPortName,
-                                         portType::in,
-                                         1));
-      chList.insert(pair<string, Channel>(chName,
-                                          Channel(chName,
-                                                  srcActor.str(), srcPortName,
-                                                  outName, dstPortName,
-                                                  1, 0)));
-      chCount++;
-      outCount++;
-      L = tl(L);
+        self(hd(L));
+        // recLog(hd(L), alreadyDrawn);
+        // add output node (and related ports/channels) to relevant lists
+        string outName("OUTPUT_" + to_string(outCount));
+        actorList.insert(pair<string, Actor>(outName,
+                                             Actor(outName, outName)));
+        stringstream srcActor;
+        srcActor << hd(L);
+        string chName("channel_" + to_string(chCount) + chAttr(getCertifiedSigType(hd(L))));
+        string srcPortName("in_" + chName);
+        string dstPortName("out_" + chName);
+        actorList.at(srcActor.str()).addPort(Port(srcPortName,
+                                                  portType::out,
+                                                  1));
+        actorList.at(outName).addPort(Port(dstPortName,
+                                           portType::in,
+                                           1));
+        chList.insert(pair<string, Channel>(chName,
+                                            Channel(chName,
+                                                    srcActor.str(), srcPortName,
+                                                    outName, dstPortName,
+                                                    1, 0)));
+        chCount++;
+        outCount++;
+        L = tl(L);
     }
 
     // Write graph information to XML
@@ -58,17 +58,17 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
     fout << "    <sdf name='" << graphName << "' type='" << graphName << "'>" << endl;
     // Bypass REC actors for SDF
     for (auto& r : recActors) {
-      vector<string> inputActorNames = actorList.at(r).getInputSignalNames();
-      bypassRec(r, inputActorNames);
-      // remove bypassed channels
-      for (auto& i : inputActorNames) {
-        string channelToRemove = channelNameFromActors(i, r);
-        actorList.at(i).removePort(chList.at(channelToRemove).getSrcPort());
-        chList.erase(chList.find(channelToRemove));
-        updateBinopArguments(r, i);
-      }
-      // remove recursive actor
-      actorList.erase(actorList.find(r));
+        vector<string> inputActorNames = actorList.at(r).getInputSignalNames();
+        bypassRec(r, inputActorNames);
+        // remove bypassed channels
+        for (auto& i : inputActorNames) {
+            string channelToRemove = channelNameFromActors(i, r);
+            actorList.at(i).removePort(chList.at(channelToRemove).getSrcPort());
+            chList.erase(chList.find(channelToRemove));
+            updateBinopArguments(r, i);
+        }
+        // remove recursive actor
+        actorList.erase(actorList.find(r));
     }
     // Modify delay actors representation for SDF
     for (auto& d : delayActors) {
@@ -96,24 +96,24 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
     }
     // update names of binop actors to reflect order of input arguments
     for (auto& b : binopActors) {
-      string newName = actorList.at(b).getName();
-      cout << "Updated order of args for " << b << ":" << endl;
-      for (auto& arg : actorList.at(b).getInputSignalNames()) {
-        newName += "_" + arg;
-        cout << "\t " << arg << endl;
-      }
-      actorList.at(b).setName(newName);
-      for (auto& c : chList) { // update actor name in channel list
-        if (c.second.getSrcActor() == b) {
-          chList.at(c.first).setSrcActor(newName);
-        } else if (c.second.getDstActor() == b) {
-          chList.at(c.first).setDstActor(newName);
+        string newName = actorList.at(b).getName();
+        cout << "Updated order of args for " << b << ":" << endl;
+        for (auto& arg : actorList.at(b).getInputSignalNames()) {
+            newName += "_" + arg;
+            cout << "\t " << arg << endl;
         }
-      }
+        actorList.at(b).setName(newName);
+        for (auto& c : chList) { // update actor name in channel list
+            if (c.second.getSrcActor() == b) {
+                chList.at(c.first).setSrcActor(newName);
+            } else if (c.second.getDstActor() == b) {
+                chList.at(c.first).setDstActor(newName);
+            }
+        }
     }
     // Write graph information (actor/channel names, ports)
     for (auto& a : actorList) {
-      cout << "Adding self loops for " << a.first << endl;
+        cout << "Adding self loops for " << a.first << endl;
         // add self loops
         string srcPortName("in_R" + a.first);
         string dstPortName("out_R" + a.first);
@@ -149,9 +149,9 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
  * translate signal binary operations into strings
  */
 static const char* binopname[] = {
-  "add", "diff", "prod", "div", "mod", "l_shift",
-  "r_shift", "greaterthan", "lessthan", "geq",
-  "leq", "equal", "notequal", "AND", "OR", "XOR"
+    "add", "diff", "prod", "div", "mod", "l_shift",
+    "r_shift", "greaterthan", "lessthan", "geq",
+    "leq", "equal", "notequal", "AND", "OR", "XOR"
 };
 
 
@@ -202,7 +202,7 @@ void Signal2SDF::visit(Tree sig)
         logDelayActor(sig, x, y, "delay");
         self(x);
         self(y);
-      return;
+        return;
     } else if (isSigPrefix(sig, x, y)) {
         logActor(sig, "prefix");
         self(x);
@@ -377,10 +377,10 @@ void Signal2SDF::visit(Tree sig)
 
 void Signal2SDF::self(Tree t)
 {
-  if (!fVisited.count(t)) {
-    fVisited.insert(t);
-    visit(t);
-  }
+    if (!fVisited.count(t)) {
+        fVisited.insert(t);
+        visit(t);
+    }
 }
 
 /**
@@ -443,19 +443,19 @@ void Signal2SDF::bypassDelay(string delayActorName, string inputActorName)
  * Modify a channel to bypass the given REC actor
  */
 void Signal2SDF::bypassRec(string recActorName, vector<string> inputSignalNames) {
-  vector<Port> outputPorts;
-  for (auto& p : actorList.at(recActorName).getPorts()) {
-    if (p.getType() == "out") {
-      outputPorts.push_back(p);
+    vector<Port> outputPorts;
+    for (auto& p : actorList.at(recActorName).getPorts()) {
+        if (p.getType() == "out") {
+            outputPorts.push_back(p);
+        }
     }
-  }
-  assert(outputPorts.size() == inputSignalNames.size()); // rec signals must have matching input and output signal numbers
-  // randomly assign inputs to outputs TODO figure out actual mapping of this
-  for (size_t i = 0; i < outputPorts.size(); i++) {
-    string channelToMod = channelNameFromPort(outputPorts[i]);
-    actorList.at(inputSignalNames[i]).addPort(outputPorts[i]);
-    chList.at(channelToMod).setSrcActor(inputSignalNames[i]); // connect output channel of REC to one of its input actors
-  }
+    assert(outputPorts.size() == inputSignalNames.size()); // rec signals must have matching input and output signal numbers
+    // randomly assign inputs to outputs TODO figure out actual mapping of this
+    for (size_t i = 0; i < outputPorts.size(); i++) {
+        string channelToMod = channelNameFromPort(outputPorts[i]);
+        actorList.at(inputSignalNames[i]).addPort(outputPorts[i]);
+        chList.at(channelToMod).setSrcActor(inputSignalNames[i]); // connect output channel of REC to one of its input actors
+    }
 }
 
 /**
@@ -494,14 +494,14 @@ string Signal2SDF::channelNameFromActors(string srcActor, string dstActor)
  * Update argument actor names of binary operators if they have changed
  */
 void Signal2SDF::updateBinopArguments(string oldArg, string newArg) {
-  for (auto& op : binopActors) {
-    vector<string> argNames = (actorList.at(op)).getInputSignalNames();
-    for (auto& arg : argNames) {
-      if (oldArg == arg) {
-        (actorList.at(op)).replaceInputSignalName(oldArg, newArg);
-      }
+    for (auto& op : binopActors) {
+        vector<string> argNames = (actorList.at(op)).getInputSignalNames();
+        for (auto& arg : argNames) {
+            if (oldArg == arg) {
+                (actorList.at(op)).replaceInputSignalName(oldArg, newArg);
+            }
+        }
     }
-  }
 }
 
 /**
