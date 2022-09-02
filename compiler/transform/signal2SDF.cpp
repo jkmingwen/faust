@@ -546,6 +546,13 @@ void Signal2SDF::addChannel(Tree sig) {
                                                         srcActor.str(), srcPortName,
                                                         dstActor.str(), dstPortName,
                                                         1, 0)));
+            Tree tId, tB;
+            if (isRec(sig, tId, tB)) { // NOTE workaround to track missing input signals for rec actors
+                vector<string> recInputs = actorList.at(dstActor.str()).getInputSignalNames();
+                if (std::find(recInputs.begin(), recInputs.end(), srcActor.str()) == recInputs.end()) {
+                    actorList.at(dstActor.str()).addInputSignalName(srcActor.str());
+                }
+            }
             chCount++;
         }
     }
