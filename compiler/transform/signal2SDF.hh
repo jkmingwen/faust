@@ -36,7 +36,6 @@ public:
   void sigToSDF(Tree t, ofstream& fout);
   string chAttr(Type t);
   void mergeChannels(string ch1, string ch2);
-  void bypassDelay(string delayActorName, string inputActorName);
   void bypassRec(string recActorName, vector<string> inputSignalNames);
   string channelNameFromPort(Port port);
   string channelNameFromActors(string srcActor, string dstActor);

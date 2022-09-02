@@ -70,30 +70,6 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
         // remove recursive actor
         actorList.erase(actorList.find(r));
     }
-    // Modify delay actors representation for SDF
-    for (auto& d : delayActors) {
-        // remove bypassed channel
-        string ch1 = channelNameFromActors(actorList.at(d).getDelayInputSigName(),
-                                           d);
-        bypassDelay(d, actorList.at(d).getDelayInputSigName());
-        actorList.at(actorList.at(d).getDelayInputSigName()).removePort(chList.at(ch1).getSrcPort());
-        chList.erase(chList.find(ch1));
-        // remove delay actor and argument channel
-        string argActorName = actorList.at(d).getArg().first;
-        string rmChannel = channelNameFromActors(argActorName, d);
-        cout << "\tRemoving channel: " << rmChannel << endl;
-        cout << "\t\tRemoving port: " << chList.at(rmChannel).getSrcPort() << endl;
-        actorList.at(argActorName).removePort(chList.at(rmChannel).getSrcPort());
-        chList.erase(chList.find(rmChannel));
-        cout << "\t\tNumber of ports left for " << argActorName << ": "
-             << actorList.at(argActorName).getPorts().size() << endl;
-        updateBinopArguments(d, actorList.at(d).getDelayInputSigName());
-        actorList.erase(actorList.find(d));
-        // Remove argument actor if it's found to be purely for delay
-        if (actorList.at(argActorName).getPorts().size() == 0) {
-            actorList.erase(actorList.find(argActorName));
-        }
-    }
     // update names of binop actors to reflect order of input arguments
     for (auto& b : binopActors) {
         string newName = actorList.at(b).getName();
@@ -199,7 +175,7 @@ void Signal2SDF::visit(Tree sig)
         self(x);
         return;
     } else if (isSigDelay(sig, x, y)) {
-        logDelayActor(sig, x, y, "delay");
+        logActor(sig, "delay");
         self(x);
         self(y);
         return;
@@ -420,23 +396,6 @@ void Signal2SDF::mergeChannels(string ch1, string ch2)
     chList.at(ch1).setDstPort(chList.at(ch2).getDstPort());
     // retain ch1 in list
     chList.erase(chList.find(ch2));
-}
-
-/**
- * Modify a channel to bypass the given delay actor
- */
-void Signal2SDF::bypassDelay(string delayActorName, string inputActorName)
-{
-    int delayArg = actorList.at(delayActorName).getArg().second;
-    // connect the input actor to the destination of the delay signal
-    for (auto& p : actorList.at(delayActorName).getPorts()) {
-        if (p.getType() == "out") {
-            string channelToMod = channelNameFromPort(p);
-            actorList.at(inputActorName).addPort(p);
-            chList.at(channelToMod).setSrcActor(inputActorName);
-            chList.at(channelToMod).setInitialTokens(delayArg);
-        }
-    }
 }
 
 /**
