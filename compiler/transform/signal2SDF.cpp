@@ -196,6 +196,9 @@ void Signal2SDF::visit(Tree sig)
         mapself(largs);
         return;
     } else if (isSigFConst(sig, type, name, file)) {
+        stringstream fout;
+        fout << *name; // TODO find out how to get FConst value
+        logActor(sig, fout.str());
         return;
     } else if (isSigFVar(sig, type, name, file)) {
         return;
