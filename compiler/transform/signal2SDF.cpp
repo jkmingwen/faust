@@ -197,8 +197,14 @@ void Signal2SDF::visit(Tree sig)
         return;
     } else if (isSigFConst(sig, type, name, file)) {
         stringstream fout;
+        string constName;
         fout << *name; // TODO find out how to get FConst value
-        logActor(sig, fout.str());
+        if (fout.str() == "fSamplingFreq") {
+          constName = "44100";
+        } else {
+          constName = fout.str();
+        }
+        logActor(sig, constName);
         return;
     } else if (isSigFVar(sig, type, name, file)) {
         return;
