@@ -296,10 +296,12 @@ void Signal2SDF::visit(Tree sig)
 
     // UI
     else if (isSigButton(sig, label)) {
-        logActor(sig, "button");
+        // logActor(sig, "button"); // NOTE set to 0 by default
+        logActor(sig, "0");
         return;
     } else if (isSigCheckbox(sig, label)) {
-        logActor(sig, "checkbox");
+        // logActor(sig, "checkbox"); // NOTE set to 0 by default
+        logActor(sig, "0");
         return;
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
         logUIActor(sig, c);
