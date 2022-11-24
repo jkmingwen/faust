@@ -296,31 +296,57 @@ void Signal2SDF::visit(Tree sig)
 
     // UI
     else if (isSigButton(sig, label)) {
-        // logActor(sig, "button"); // NOTE set to 0 by default
-        logActor(sig, "0");
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "button");
+        } else {
+            logActor(sig, "0"); // NOTE set to 0 by default
+        }
         return;
     } else if (isSigCheckbox(sig, label)) {
-        // logActor(sig, "checkbox"); // NOTE set to 0 by default
-        logActor(sig, "0");
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "checkbox");
+        } else {
+            logActor(sig, "0"); // NOTE set to 0 by default
+        }
         return;
     } else if (isSigVSlider(sig, label, c, x, y, z)) {
-        logUIActor(sig, c);
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "vslider");
+        } else {
+            logUIActor(sig, c);
+        }
         // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigHSlider(sig, label, c, x, y, z)) {
-        logUIActor(sig, c);
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "hslider");
+        } else {
+            logUIActor(sig, c);
+        }
         // self(c), self(x), self(y), self(z);
         return;
     } else if (isSigNumEntry(sig, label, c, x, y, z)) {
-        logUIActor(sig, c);
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "nentry");
+        } else {
+            logUIActor(sig, c);
+        }
         self(c), self(x), self(y), self(z);
         return;
     } else if (isSigVBargraph(sig, label, x, y, z)) {
-        logActor(sig, "vbargraph");
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "vbargraph");
+        } else {
+            logActor(sig, "vbargraph"); // NOTE haven't implemented output GUI implementation yet
+        }
         self(x), self(y), self(z);
         return;
     } else if (isSigHBargraph(sig, label, x, y, z)) {
-        logActor(sig, "hbargraph");
+        if (gGlobal->gKeepUISwitch) {
+            logActor(sig, "hbargraph");
+        } else {
+            logActor(sig, "hbargraph"); // NOTE haven't implemented output GUI implementation yet
+        }
         self(x), self(y), self(z);
         return;
     }
