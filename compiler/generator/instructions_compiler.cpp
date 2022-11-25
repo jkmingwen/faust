@@ -305,7 +305,13 @@ Tree InstructionsCompiler::prepare(Tree LS)
     // Generate SDF representation if -sdf option is set (.xml file)
     if (gGlobal->gPrintSDFSwitch) {
         Signal2SDF V;
-        ofstream xmlfile(subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str());
+        string outputFileName;
+        if (gGlobal->gSDFOutputFileSwitch) {
+            outputFileName = gGlobal->gSDFOutputFileName;
+        } else {
+            outputFileName = subst("$0-sig.xml", gGlobal->makeDrawPath()).c_str();
+        }
+        ofstream xmlfile(outputFileName);
         V.sigToSDF(L5, xmlfile);
     }
 

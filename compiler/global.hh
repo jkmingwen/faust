@@ -559,6 +559,8 @@ struct global {
     bool   gExportDSP;
     bool   gPrintSDFSwitch;
     bool   gKeepUISwitch;
+    bool   gSDFOutputFileSwitch;
+    string gSDFOutputFileName;
 
     // Source file injection
     bool   gInjectFlag;
