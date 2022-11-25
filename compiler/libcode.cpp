@@ -497,10 +497,15 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-sdf", "--sdf3xml")) {
             gGlobal->gPrintSDFSwitch = true;
             i += 1;
-            if (isCmd(argv[i], "-keep-ui", "--keep-ui-operators")) {
-                gGlobal->gKeepUISwitch = true;
-                i += 1;
-            }
+
+        } else if (isCmd(argv[i], "-keep-ui", "--keep-ui-operators")) {
+            gGlobal->gKeepUISwitch = true;
+            i += 1;
+
+        } else if (isCmd(argv[i], "-sdfname") && (i + 1 < argc)) {
+            gGlobal->gSDFOutputFileSwitch = true;
+            gGlobal->gSDFOutputFileName = argv[i + 1];
+            i += 2;
 
             // 'real' options
         } else if (isCmd(argv[i], "-single", "--single-precision-floats")) {
