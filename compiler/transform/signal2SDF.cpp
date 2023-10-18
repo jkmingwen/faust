@@ -149,7 +149,13 @@ void Signal2SDF::visit(Tree sig)
             sig = tl(sig);
         } while (isList(sig));
     } else if (p) {
+      if (p == gGlobal->gPowPrim) { // a very roundabout way to identify power operators since they're categorized under xtended types
+        if (isSigPow(sig, &i, x, y)) {
+          logPowActor(sig, x, y, "pow");
+        }
+      } else {
         logActor(sig, p->name());
+      }
         for (Tree b : sig->branches()) {
             self(b);
         }
@@ -641,4 +647,31 @@ void Signal2SDF::logUIActor(Tree sig, Tree init) {
         error << __FILE__ << ":" << __LINE__ << " ERROR : init value for UI component not found : " << *sig << endl;
         throw faustexception(error.str());
     }
+}
+
+/**
+ * Add the power actor associated with sig to the actor list
+ * and track the orger of execution - note that it denotes y^x
+ */
+void Signal2SDF::logPowActor(Tree sig, Tree x, Tree y, string type) {
+    stringstream actorName;
+    stringstream arg1Name;
+    stringstream arg2Name;
+    actorName << sig;
+    arg1Name << x;
+    arg2Name << y;
+    actorList.insert(pair<string, Actor>(actorName.str(),
+                                         Actor(actorName.str(), type)));
+    // track order of arguments for binary operators
+    binopActors.push_back(actorName.str());
+    actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
+    actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
+    addChannel(sig);
+}
+
+/**
+ * Check if a signal is a power operator and assign its branches to args x and y
+ */
+bool Signal2SDF::isSigPow(Tree sig, int* i, Tree &x, Tree &y) {
+  return isTree(sig, "pow", x, y);
 }

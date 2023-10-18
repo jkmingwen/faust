@@ -46,4 +46,6 @@ public:
   void logRecActor(Tree sig, Tree le, string type);
   void logBinopActor(Tree sig, Tree x, Tree y, string type);
   void logUIActor(Tree sig, Tree init);
+  void logPowActor(Tree sig, Tree x, Tree y, string type);
+  bool isSigPow(Tree sig, int* i, Tree &x, Tree &y);
 };
