@@ -26,7 +26,7 @@ protected:
   int outCount = 0;
   vector<string> delayActors;
   vector<string> recActors;
-  vector<string> binopActors;
+  vector<string> inputArgTrackedActors;
 
   void visit(Tree t) override;
 
@@ -39,7 +39,7 @@ public:
   void bypassRec(string recActorName, vector<string> inputSignalNames);
   string channelNameFromPort(Port port);
   string channelNameFromActors(string srcActor, string dstActor);
-  void updateBinopArguments(string oldArg, string newArg);
+  void updateArguments(string oldArg, string newArg);
   void addChannel(Tree sig);
   void logActor(Tree sig, string type);
   void logDelayActor(Tree sig, Tree x, Tree y, string type);
@@ -47,5 +47,6 @@ public:
   void logBinopActor(Tree sig, Tree x, Tree y, string type);
   void logUIActor(Tree sig, Tree init);
   void logPowActor(Tree sig, Tree x, Tree y, string type);
+  void logCastActor(Tree sig, Tree x, string type);
   bool isSigPow(Tree sig, int* i, Tree &x, Tree &y);
 };

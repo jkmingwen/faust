@@ -65,13 +65,13 @@ void Signal2SDF::sigToSDF(Tree L, ofstream& fout)
             string channelToRemove = channelNameFromActors(i, r);
             actorList.at(i).removePort(chList.at(channelToRemove).getSrcPort());
             chList.erase(chList.find(channelToRemove));
-            updateBinopArguments(r, i);
+            updateArguments(r, i);
         }
         // remove recursive actor
         actorList.erase(actorList.find(r));
     }
     // update names of binop actors to reflect order of input arguments
-    for (auto& b : binopActors) {
+    for (auto& b : inputArgTrackedActors) {
         string newName = actorList.at(b).getName();
         cout << "Updated order of args for " << b << ":" << endl;
         for (auto& arg : actorList.at(b).getInputSignalNames()) {
@@ -152,6 +152,22 @@ void Signal2SDF::visit(Tree sig)
       if (p == gGlobal->gPowPrim) { // a very roundabout way to identify power operators since they're categorized under xtended types
         if (isSigPow(sig, &i, x, y)) {
           logPowActor(sig, x, y, "pow");
+        }
+      } else if (p == gGlobal->gFloorPrim) {
+        if (isTree(sig, "floor", x)) {
+          logCastActor(sig, x, "floor");
+        }
+      } else if (p == gGlobal->gMaxPrim) {
+        if (isTree(sig, "max", x, y)) {
+          logBinopActor(sig, x, y, "max");
+        }
+      } else if (p == gGlobal->gMinPrim) {
+        if (isTree(sig, "min", x, y)) {
+          logBinopActor(sig, x, y, "min");
+        }
+      } else if (p == gGlobal->gSqrtPrim) {
+        if (isTree(sig, "sqrt", x)) {
+          logCastActor(sig, x, "sqrt");
         }
       } else {
         logActor(sig, p->name());
@@ -291,11 +307,11 @@ void Signal2SDF::visit(Tree sig)
 
     // Int and Float Cast
     else if (isSigIntCast(sig, x)) {
-        logActor(sig, "int");
+        logCastActor(sig, x, "int");
         self(x);
         return;
     } else if (isSigFloatCast(sig, x)) {
-        logActor(sig, "float");
+        logCastActor(sig, x, "float");
         self(x);
         return;
     }
@@ -493,10 +509,10 @@ string Signal2SDF::channelNameFromActors(string srcActor, string dstActor)
 }
 
 /**
- * Update argument actor names of binary operators if they have changed
+ * Update argument actor names of operators if they have changed
  */
-void Signal2SDF::updateBinopArguments(string oldArg, string newArg) {
-    for (auto& op : binopActors) {
+void Signal2SDF::updateArguments (string oldArg, string newArg) {
+    for (auto& op : inputArgTrackedActors) {
         vector<string> argNames = (actorList.at(op)).getInputSignalNames();
         for (auto& arg : argNames) {
             if (oldArg == arg) {
@@ -626,7 +642,7 @@ void Signal2SDF::logBinopActor(Tree sig, Tree x, Tree y, string type) {
     actorList.insert(pair<string, Actor>(actorName.str(),
                                          Actor(actorName.str(), type)));
     // track order of arguments for binary operators
-    binopActors.push_back(actorName.str());
+    inputArgTrackedActors.push_back(actorName.str());
     actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
     actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
     addChannel(sig);
@@ -663,10 +679,26 @@ void Signal2SDF::logPowActor(Tree sig, Tree x, Tree y, string type) {
     actorList.insert(pair<string, Actor>(actorName.str(),
                                          Actor(actorName.str(), type)));
     // track order of arguments for binary operators
-    binopActors.push_back(actorName.str());
+    inputArgTrackedActors.push_back(actorName.str());
     actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
     actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
     addChannel(sig);
+}
+
+/**
+ * Add the actor associated with sig to the actor list
+ */
+void Signal2SDF::logCastActor(Tree sig, Tree x, string type) {
+  stringstream actorName; // get unique actor names from signal
+  stringstream argName;
+  actorName << sig;
+  argName << x;
+  cout << "actor name: " << sig << ", arg name: " << x << endl;
+  actorList.insert(pair<string, Actor>(actorName.str(),
+                                       Actor(actorName.str(), type)));
+  inputArgTrackedActors.push_back(actorName.str());
+  actorList.at(actorName.str()).addInputSignalName(argName.str());
+  addChannel(sig);
 }
 
 /**
