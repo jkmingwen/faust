@@ -473,6 +473,7 @@ void Signal2SDF::bypassRec(string recActorName, vector<string> inputSignalNames)
         string channelToMod = channelNameFromPort(outputPorts[i]);
         actorList.at(inputSignalNames[i]).addPort(outputPorts[i]);
         chList.at(channelToMod).setSrcActor(inputSignalNames[i]); // connect output channel of REC to one of its input actors
+        chList.at(channelToMod).setInitialTokens(1);
     }
 }
 
