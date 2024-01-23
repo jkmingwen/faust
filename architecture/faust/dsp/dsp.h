@@ -237,6 +237,7 @@ class FAUST_API dsp_factory {
 
 #if defined (__SSE__)
 #include <xmmintrin.h>
+#include <cstdint>
 #endif
 
 class FAUST_API ScopedNoDenormals {
