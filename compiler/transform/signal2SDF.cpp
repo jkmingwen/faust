@@ -307,11 +307,11 @@ void Signal2SDF::visit(Tree sig)
 
     // Int and Float Cast
     else if (isSigIntCast(sig, x)) {
-        logCastActor(sig, x, "int");
+        logCastActor(sig, x, "float2int");
         self(x);
         return;
     } else if (isSigFloatCast(sig, x)) {
-        logCastActor(sig, x, "float");
+        logCastActor(sig, x, "int2float");
         self(x);
         return;
     }
