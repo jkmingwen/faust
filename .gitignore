@@ -1,6 +1,7 @@
 dox/*
 build/xcode/*
 build/bin/*
+build/usr/
 build/lib/*
 *~
 compile.sh
