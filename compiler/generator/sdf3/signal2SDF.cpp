@@ -221,12 +221,14 @@ void Signal2SDF::visit(Tree sig)
 
     // Foreign functions
     else if (isSigFFun(sig, ff, largs)) {
+        logActor(sig, "ffun");
         mapself(largs);
         return;
     } else if (isSigFConst(sig, type, name, file)) {
         logActor(sig, tree2str(name));
         return;
     } else if (isSigFVar(sig, type, name, file)) {
+        logActor(sig, "fvar");
         return;
     }
 
@@ -364,9 +366,11 @@ void Signal2SDF::visit(Tree sig)
         self(x), self(y);
         return;
     } else if (isSigEnable(sig, x, y)) {
+        logActor(sig, "enable");
         self(x), self(y);
         return;
     } else if (isSigControl(sig, x, y)) {
+        logActor(sig, "control");
         self(x), self(y);
         return;
     }
