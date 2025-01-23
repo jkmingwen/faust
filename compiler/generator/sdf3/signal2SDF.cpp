@@ -28,6 +28,7 @@
 #include "Text.hh"
 #include "global.hh"
 #include "ppsig.hh"
+#include "prim2.hh"
 #include "property.hh"
 #include "signalVisitor.hh"
 #include "signals.hh"
@@ -221,7 +222,7 @@ void Signal2SDF::visit(Tree sig)
 
     // Foreign functions
     else if (isSigFFun(sig, ff, largs)) {
-        logActor(sig, "ffun");
+        logActor(sig, ffname(ff));
         mapself(largs);
         return;
     } else if (isSigFConst(sig, type, name, file)) {
