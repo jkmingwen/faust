@@ -103,11 +103,26 @@ void Signal2SDF::sigToSDF(Tree L, ostream& fout)
             }
         }
     }
-    // update names of binop actors to reflect order of input arguments
+    // update names of UI actors to reflect their parameters
     for (auto& b : uiActors) {
         string newName = actorList.at(b).getName();
         for (auto& [paramName, value] : actorList.at(b).getParams()) {
-            newName += "_" + paramName + value;
+            newName += "PARAM" + paramName + value;
+        }
+        actorList.at(b).setName(newName);
+        for (auto& c : chList) {  // update actor name in channel list
+            if (c.second.getSrcActor() == b) {
+                chList.at(c.first).setSrcActor(newName);
+            } else if (c.second.getDstActor() == b) {
+                chList.at(c.first).setDstActor(newName);
+            }
+        }
+    }
+    // update names of delay actors to reflect their parameters
+    for (auto& b : delayActors) {
+        string newName = actorList.at(b).getName();
+        for (auto& [paramName, value] : actorList.at(b).getParams()) {
+            newName += "PARAM" + paramName + value;
         }
         actorList.at(b).setName(newName);
         for (auto& c : chList) {  // update actor name in channel list
@@ -219,7 +234,7 @@ void Signal2SDF::visit(Tree sig)
         self(x);
         return;
     } else if (isSigDelay(sig, x, y)) {
-        logActor(sig, "delay");
+        logDelayActor(sig, x, y, "delay");
         self(x);
         self(y);
         return;
@@ -583,28 +598,22 @@ void Signal2SDF::logActor(Tree sig, const string& type)
 }
 
 /**
- * Add the actor associated with sig to the actor list
+ * Add the delay actor associated with sig to the actor list and track range of delay values
  */
 void Signal2SDF::logDelayActor(Tree sig, Tree x, Tree y, const string& type)
 {
     stringstream actorName;
-    stringstream arg1Name;
-    stringstream arg2Name;
-    int          i;
     actorName << sig;
-    arg1Name << x;
-    arg2Name << y;
     actorList.insert(pair<string, Actor>(actorName.str(), Actor(actorName.str(), type)));
-    // NOTE assume here that fixed delays will only have Int argument, might need to expand to
-    // include Real values
-    if (isSigInt(y, &i)) {  // fixed delay: track delay length to model later
-        delayActors.push_back(actorName.str());
-        actorList.at(actorName.str()).setDelayInputSigName(arg1Name.str());
-        actorList.at(actorName.str()).setArg(arg2Name.str(), i);
-    } else {  // variable delay: leave alone; will resolve later
-        actorList.at(actorName.str()).addInputSignalName(arg1Name.str());
-        actorList.at(actorName.str()).addInputSignalName(arg2Name.str());
-    }
+    delayActors.push_back(actorName.str());
+
+    // delay sizes need to be integer values rather than floats/doubles
+    interval delayRange = getCertifiedSigType(y)->getInterval();
+    std::string min        = std::to_string((int) delayRange.lo());
+    std::string max        = std::to_string((int) delayRange.hi());
+    actorList.at(actorName.str()).addParameter("min", min);
+    actorList.at(actorName.str()).addParameter("max", max);
+
     addChannel(sig);
 }
 
