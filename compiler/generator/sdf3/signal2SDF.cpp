@@ -369,11 +369,11 @@ void Signal2SDF::visit(Tree sig)
         return;
     } else if (isSigVBargraph(sig, label, x, y, z)) {
         logUIGraphActor(sig, "vbargraph", x, y, z);
-        self(x), self(y), self(z);
+        // self(x), self(y), self(z);
         return;
     } else if (isSigHBargraph(sig, label, x, y, z)) {
         logUIGraphActor(sig, "hbargraph", x, y, z);
-        self(x), self(y), self(z);
+        // self(x), self(y), self(z);
         return;
     }
 
@@ -711,7 +711,10 @@ void Signal2SDF::logUISliderActor(Tree sig, const std::string& type, Tree init, 
 void Signal2SDF::logUIGraphActor(Tree sig, const std::string& type, Tree min, Tree max, Tree t0)
 {
     std::map<std::string, Tree> parameters = {
-        {"min", min}, {"max", max}, {"tzero", t0}};
+        {"min", min},
+        {"max", max}
+        // {"tzero", t0} // NOTE excluded bargraph as it doesn't seem to relate to parameters
+    };
     stringstream actorName;  // get unique actor names from signal
     actorName << sig;
     actorList.insert(pair<string, Actor>(actorName.str(), Actor(actorName.str(), type)));
